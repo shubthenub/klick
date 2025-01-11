@@ -1,7 +1,7 @@
 'use client'
 import { Drawer } from "antd";
 import useWindowDimensions from "@/hooks/useWindowsDimension";
-import css from "@/styles/Sidebar.module.css";
+import css from "@/styles/sidebar.module.css";
 const SidebarContainer = ({
   isDrawrOpen,
   setIsDrawerOpen,

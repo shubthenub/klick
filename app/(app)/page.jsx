@@ -1,10 +1,11 @@
 "use client";
 import { useSettings } from "@/context/settings/settings-context";
 import React from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
+import { useUser, UserButton , RedirectToSignIn } from "@clerk/nextjs";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@clerk/nextjs";
+import HomeView from "@/sections/HomeView";
 
 const page = () => {
   const { isSignedIn } = useUser(); // Check if the user is signed in
@@ -12,7 +13,7 @@ const page = () => {
 
   // Ensure the redirect happens only on the client side, after the component has mounted
   useEffect(() => {
-    if (!isSignedIn) {
+    if (isSignedIn===false) {  //dont remove this useeffect
       router.push("/sign-in"); // Redirect to sign-in page if not signed in
     }
   }, [isSignedIn, router]); // Runs when the isSignedIn state changes
@@ -25,8 +26,10 @@ const page = () => {
 
   // Prevent rendering while checking sign-in status
   if (!isSignedIn) {
-    return null; // Return nothing while redirecting
-  }
+    RedirectToSignIn(); // Redirect to sign-in page
+    return null; // Prevent rendering
+}
+
 
   //using context for theme
   const {
@@ -34,12 +37,13 @@ const page = () => {
   } = useSettings();
   return (
     <>
-      <div>
+      {/* <div>
         <h1>{theme}</h1>
       </div>
       <div>
         <h1>Welcome to the Dashboard!</h1>
-      </div>
+      </div> */}
+      <HomeView/>
     </>
   );
 };

@@ -18,7 +18,7 @@ const Header = () => {
           <div className={css.sidebarButton}>
           <SidebarButton/>
           </div>
-          <Image src="/images/logo.png" alt="Logo" width={150} height={45} quality={100} />
+          <Image src="/images/logo1.png" alt="Logo" width={150} height={45} quality={100} />
 
            {/* actions */}
            <Flex gap={25} align="center"> 

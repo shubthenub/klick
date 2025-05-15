@@ -29,3 +29,9 @@
     justify-content: center;
     background: var(--primary);
 }
+
+@media (max-width: 920px) {
+    .right{
+        display: none;
+    }
+}

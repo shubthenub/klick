@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ably-labs/react-hooks": "^2.1.2",
     "@ant-design/cssinjs": "^1.18.0",
     "@ant-design/happy-work-theme": "^1.0.0",
     "@clerk/nextjs": "^6.10.4",
@@ -16,6 +17,7 @@
     "@prisma/client": "^6.2.1",
     "@tanstack/react-query-devtools": "^5.65.1",
     "@tsparticles/react": "^3.0.0",
+    "ably": "^2.9.0",
     "antd": "^5.11.5",
     "cloudinary": "^2.5.1",
     "dayjs": "^1.11.13",

@@ -17,7 +17,7 @@ const CommentInput = ({queryId , postId , setExpanded}) => {
 
         //too optimistically update the comments on feed
         onMutate: async()=>{
-            setExpanded(true);
+            // setExpanded(true);
             //cancel any outgoing refetches
             await queryClient.cancelQueries(queryId);
             //snapshot the previous value
@@ -61,11 +61,13 @@ const CommentInput = ({queryId , postId , setExpanded}) => {
         }
     })
   return (
-    <Flex gap={"1rem"} align='center' > 
+    <Flex gap={"1rem"} align='center' 
+    > 
         <Avatar src={user?.imageUrl} size={30} style={{minWidth:"30px"}} />
 
         {/* input box */}
         <Input.TextArea
+            variant='borderless'
             placeholder='Comment..'
             style={{resize:"none"}}
             autoSize={{minRows:1 , maxRows:5}}

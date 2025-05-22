@@ -8,14 +8,25 @@ import LikeButton from "./LikeButton";
 import CommentButton from "./CommentButton";
 import CommentsSection from "./CommentsSection";
 import Link from "next/link";
+import { BsThreeDotsVertical } from "react-icons/bs";
+import { SettingsContext } from "@/context/settings/settings-context";
+import { useContext } from "react";
+import PostMenu from "./PostMenu";
 const Post = ({ data , queryId}) => {
   console.log(data) 
+  const [showMenu , setShowMenu] = React.useState(false);
+  const handleMenuClick = () => {
+    setShowMenu(!showMenu);
+  };
+  const {
+    settings: { theme }, //so that on theme change three dots changes bg color
+  } = useContext(SettingsContext);
   return (
     <div className={css.wrapper}>
       <Box>
         <div className={css.container}>
           {/* profile info */}
-          <Flex align="center" justify="space-between">
+          <Flex align="center" justify="space-between" style={{position:"relative"}}>
             {/* left side = profile info */}
             <Flex gap={".5rem"} align="center">
               <Link
@@ -43,6 +54,19 @@ const Post = ({ data , queryId}) => {
                 </Typography.Text>
               </Flex>
             </Flex>
+            {/* right side = three dots */}
+            {
+              showMenu && (
+                <PostMenu postId={data?.id}/>
+              )
+            }
+            <button
+              onClick={() => handleMenuClick()}
+              style={{border: "none", cursor: "pointer",height:"1.5rem", width:"1.5rem",background:"transparent",}}
+            >
+              <BsThreeDotsVertical color={theme=="dark"?"white":"black"} />
+            </button>
+            
           </Flex>
 
           {/* caption */}

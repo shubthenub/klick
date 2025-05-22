@@ -23,7 +23,7 @@ const Header = () => {
            {/* actions */}
            <Flex gap={25} align="center"> 
             <ModeButton/>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
           </Flex>
         </div>
       </Box>

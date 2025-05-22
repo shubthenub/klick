@@ -1,0 +1,23 @@
+.container{
+    transform: rotateY('30deg');
+    width: 10rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    position: absolute;
+    top: 1rem;
+    right: 2rem;
+    padding: 0.3rem;
+    border-radius: 10px;
+    z-index: 100000;
+}
+
+.menuitem{
+    display: flex;
+    align-items: center;
+    padding: .2rem;
+    gap: .1rem;
+    cursor: pointer;
+    
+}

@@ -12,18 +12,23 @@ const Comment = ({ data }) => {
     settings: { theme },    //so that on theme change comment changes bg color
   } = useContext(SettingsContext);
   return (
-    <Flex gap={"0.5rem"}>
+    <Flex gap={"0.5rem"} align="center" 
+    style={{  borderTop:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",   }}
+    >
       {/* avatar of user */}
-      <Avatar size={25} src={data?.author?.image_url} />
+      <Avatar size={30} src={data?.author?.image_url} />
       {/* comment */}
-      <Flex flex={1} gap="0.5rem" className={cx(css.comment , css[theme])}>
+      <Flex flex={1} gap="0.5rem" className={cx(css.comment , css[theme])}
+      style={{backgroundColor: theme === "dark" ? "black" : "hsla(0, 0%, 100%, 1)"}}
+      >
         <Flex
           vertical
-          gap="0.5rem"
           style={{ width: "100%", padding: "0.4rem" }}
         >
           <Flex gap={"1rem"} justify="space-between"
-          style={{fontSize:".8rem" , fontWeight:"500"}}>
+          style={{fontSize:".8rem" , fontWeight:"600",
+            
+          }}>
             {/* name of author */}
             <Typography.Text>
               {data?.author?.first_name} {data?.author?.last_name}

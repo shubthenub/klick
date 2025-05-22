@@ -10,12 +10,14 @@ const CommentsSection = ({comments , postId , queryId}) => {
   return (
       <Flex vertical gap="1rem" 
       className={`${css.commentsContainer} ${expanded ? css.expanded : css.collapsed}`}
+        
       >
         <>
             {/* comments */}
             {
                 comments?.length>0 && (
                     <Flex
+                    style={{borderBottom:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",}}
                     vertical
                     gap="0.5rem"
                     className={css.commentsContainer}
@@ -26,7 +28,7 @@ const CommentsSection = ({comments , postId , queryId}) => {
                             data={comments[comments.length - 1]}
                             />
                         ):(
-                            comments?.map((comment , index) => (
+                            [...comments].reverse()?.map((comment , index) => ( //to get the latest comment at the top
                                 <Comment
                                 key={index}
                                 data={comment}
@@ -47,7 +49,7 @@ const CommentsSection = ({comments , postId , queryId}) => {
                  >
                     <Flex align='center' gap='0.5rem'>
                         <Icon icon={(!expanded)?"ic:outline-expand-more":"ic:outline-expand-less"} />
-                        {(!expanded)?`Show more comments`:"Show less comments"}
+                        {(!expanded)?`Show all comments`:"Show less comments"}
                     </Flex>
 
                 </Button>

@@ -59,6 +59,35 @@ export const createPost = async (post, userId) => {
     }
 };
 
+export const deletePost = async (postId, userId) => {
+    try {
+        // Verify post exists and belongs to the user
+        const post = await db.Post.findUnique({
+            where: { id: postId },
+        });
+
+        if (!post) {
+            throw new Error("Post not found");
+        }
+
+        if (post.authorId !== userId) {
+            throw new Error("Unauthorized to delete this post");
+        }
+
+        // Delete associated comments, likes, and trends first (if foreign key constraint)
+        await db.comment.deleteMany({ where: { postId } });
+        await db.like.deleteMany({ where: { postId } });
+        await db.trend.deleteMany({ where: { postId } });
+
+        // Then delete the post
+        await db.Post.delete({ where: { id: postId } });
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        throw error;
+    }
+};
 
 export const getFeed = async (lastCursor, id) => {
     try {

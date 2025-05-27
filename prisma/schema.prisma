@@ -22,6 +22,9 @@ model User {
   Comment       Comment[]
   Followers     Follow[] @relation("Following")
   Following     Follow[] @relation("Follower")
+
+  chatParticipants ChatParticipant[]
+  sentMessages     Message[] @relation("MessageSender")
 }
 
 model Post {
@@ -71,3 +74,32 @@ model Follow {
   followingId String
   createdAt   DateTime @default(now())
 }
+
+
+model Chat {
+  id           String             @id @default(cuid())
+  participants ChatParticipant[]
+  messages     Message[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model ChatParticipant {
+  id      String   @id @default(cuid())
+  user    User     @relation(fields: [userId], references: [id])
+  userId  String
+  chat    Chat     @relation(fields: [chatId], references: [id])
+  chatId  String
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  chat       Chat     @relation(fields: [chatId], references: [id])
+  chatId     String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  senderId   String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+

@@ -22,7 +22,7 @@ const Sidebar = () => {
   }, []);
 
   const {
-    settings: { isSidebarOpen },
+    settings: { isSidebarOpen, isMiniSidebar },
     setSettings,
   } = useSettings();
 

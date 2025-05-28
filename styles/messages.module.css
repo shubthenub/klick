@@ -1,14 +1,15 @@
 
 .container {
   display: flex;
-  height: 100vh;
+  min-height: 80vh;
 }
 
 .leftcontainer {
   width: 300px;
   border-right: 1px solid #e1e1e1;
   overflow-y: auto;
-  background: #f8f9fa;
+  /* background: #f8f9fa; */
+  background: #ffffff;
 }
 
 .rightcontainer {
@@ -32,9 +33,14 @@
   margin-bottom: 5px;
 }
 
+.activeFollower {
+  background: #f1f1f1;
+  border-left: 4px solid #f0c136;
+}
+
 .followerItem:hover {
   background: #e9ecef;
-  background-color: aqua;
+  background-color: #f1f1f1;;
 }
 
 .followerItem.active {

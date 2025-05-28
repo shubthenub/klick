@@ -8,6 +8,7 @@ export const SettingsContextProvider = ({children}) => {
     const [settings , setSettings]=useState({
         theme: 'light',
         isSidebarOpen: false,
+        isMiniSidebar: false,
     });
   return (
     <SettingsContext.Provider value={{settings, setSettings}}>

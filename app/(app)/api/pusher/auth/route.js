@@ -12,7 +12,8 @@ const pusher = new Pusher({
 
 const permittedOrigins = [
   'http://localhost:3000',
-  'https://cheaply-touching-clam.ngrok-free.app'
+  'https://cheaply-touching-clam.ngrok-free.app',
+  'https://klicktest.loophole.site'
 ];
 
 function verifyClerkToken(token) {

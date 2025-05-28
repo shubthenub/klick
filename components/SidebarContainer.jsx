@@ -6,6 +6,7 @@ const SidebarContainer = ({
   isDrawrOpen,
   setIsDrawerOpen,
   children,
+  isMiniSidebar = false,
   ...other
 }) => {
   const { width } = useWindowDimensions();

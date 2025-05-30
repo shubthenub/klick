@@ -5,7 +5,7 @@ import { createOrGetChat } from "@/lib/createOrGetChat";
 import { createClient } from "@supabase/supabase-js";
 import Pusher from "pusher";
 
-const publicKey = process.env.CLERK_PEM_PUBLIC_KEY.replace(/\\n/g, '\n');
+const publicKey = process.env.CLERK_PEM_PUBLIC_KEY;
 console.log(publicKey)
 
 const permittedOrigins = [

@@ -5,11 +5,14 @@ import { createOrGetChat } from "@/lib/createOrGetChat";
 import { createClient } from "@supabase/supabase-js";
 import Pusher from "pusher";
 
-const publicKey = process.env.CLERK_PEM_PUBLIC_KEY;
+const publicKey = process.env.CLERK_PEM_PUBLIC_KEY.replace(/\\n/g, '\n');
+console.log(publicKey)
+
 const permittedOrigins = [
   'http://localhost:3000',
   'https://cheaply-touching-clam.ngrok-free.app',
-  'https://klicktest.loophole.site'
+  'https://klicktest.loophole.site',
+  'https://klick-one.vercel.app'
 ];
 
 function verifyClerkToken(token) {

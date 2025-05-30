@@ -7,11 +7,13 @@ import { useParams } from "next/navigation";
 import Avatar from "antd/es/avatar/avatar";
 import { SettingsContext } from "@/context/settings/settings-context";
 import css from "@/styles/messages.module.css";
+import { Input, Space } from 'antd';
+import { usePathname } from "next/navigation";
 
 const Layout = ({ children }) => {
   const { settings } = useContext(SettingsContext);
   const isDark = settings.theme === "dark";
-
+  const pathname = usePathname();
   const params = useParams();
   const userId = params.userId;
 
@@ -37,14 +39,20 @@ const Layout = ({ children }) => {
   }, [userId]);
 
   const activateFollower = (followerId) => {
-    setActiveFollower(followerId);
+    setActiveFollower(followerId || pathname.substring(pathname.lastIndexOf('/') + 1));
   };
+  useEffect(() => {
+    const activeFollowerId = pathname.substring(pathname.lastIndexOf('/') + 1);
+    if (activeFollowerId) {
+      setActiveFollower(activeFollowerId);
+    }
+  }, [pathname]);
 
   return (
     <div
       className={css.container}
       style={{
-        backgroundColor: isDark ? "#1a1a1a" : "#fff",
+        backgroundColor: isDark ? "rgb(0,0,0)" : "#fff",
         color: isDark ? "#fff" : "#000",
       }}
     >
@@ -53,9 +61,23 @@ const Layout = ({ children }) => {
         className={css.leftcontainer}
         style={{
           borderRight: `1px solid ${isDark ? "#333" : "#e1e1e1"}`,
-          background: isDark ? "#121212" : "#ffffff",
+          backgroundColor: isDark ? "rgb(0,0,0)" : "#fff",
         }}
-      >
+      > 
+        <div className={css.followerSearch}
+        style={{
+          backgroundColor: isDark ? "rgb(0,0,0)" : "#fff",
+          padding: "10px",
+          // borderBottom: `1px solid ${isDark ? "#333" : "#e1e1e1"}`,
+        }}
+        >
+          <Input.Search
+          placeholder="Search followers"
+          >
+          
+        </Input.Search>
+        </div>
+        
         {isLoading ? (
           <p>Loading...</p>
         ) : followers?.length > 0 ? (
@@ -75,8 +97,8 @@ const Layout = ({ children }) => {
                   style={{
                     backgroundColor: isActive
                       ? isDark
-                        ? "#333"
-                        : "#e0e0e0"
+                        ? "rgb(29 29 29)"
+                        : "#f1f1f1"
                       : "transparent",
                   }}
                 >
@@ -109,7 +131,7 @@ const Layout = ({ children }) => {
       <div
         className={css.rightcontainer}
         style={{
-          backgroundColor: isDark ? "#121212" : "#ffffff",
+          backgroundColor: isDark ? "rgb(0,0,0)" : "#fff",
         }}
       >
         {children}

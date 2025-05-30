@@ -1,12 +1,3 @@
 .message {
-  max-width: 60%;
-  padding: 0.75rem 1rem;
-  border-radius: 1.5rem;
-  background-color: #999797;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  word-break: break-word;
-  white-space: pre-wrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  color: #111;
+  
 }

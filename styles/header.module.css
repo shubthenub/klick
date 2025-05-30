@@ -17,7 +17,7 @@
     display: none;
   }
   
-  @media (max-width: 1268px) {
+  @media (max-width: 900px) {
     .logo{
       display: none;
     }

@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
+import useWindowDimensions from "@/hooks/useWindowsDimension";
 import Box from "@/components/Box/Box";
 import css from "@/styles/sidebar.module.css";
 import { sidebarRoutes } from "@/lib/sidebarRoutes";
@@ -17,12 +18,28 @@ const Sidebar = () => {
   const { signOut } = useClerk();
   const router = useRouter();
   const { user } = useUser();
+  const [isMini, setIsMini] = useState(false);
+
+  const { width } = useWindowDimensions();
+  useEffect(() => {
+  const isHome = pathname === "/";
+  const isMobile = width <= 900;
+
+  if (isMobile) {
+    setIsMini(false); // Always show full sidebar on mobile
+  } else {
+    const flag = (width < 1270 && width > 900) || !isHome;
+    setIsMini(flag);
+  }
+}, [width, pathname]);
+  
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const {
-    settings: { isSidebarOpen, isMiniSidebar },
+    settings: { isSidebarOpen,  },
     setSettings,
   } = useSettings();
 
@@ -40,8 +57,12 @@ const Sidebar = () => {
   }, [pathname, handleDrawerClose]);
 
   const isActive = (route) => {
-    if (route.route === pathname) return css.active;
-  };
+  if (route.route === "/") {
+    return pathname === "/" ? css.active : "";
+  }
+  return pathname.startsWith(route.route) ? css.active : "";
+};
+
 
   const activeColor = (route) => {
     return isActive(route) && "var(--primary)";
@@ -53,7 +74,7 @@ const Sidebar = () => {
         isDrawrOpen={isSidebarOpen}
         setIsDrawerOpen={handleDrawerClose}
       >
-        <div className={css.wrapper}>
+        <div className={!isMini?css.wrapper:css.mini}>
           <Box className={css.container}>
             {sidebarRoutes(user).map((route, index) => (
               <Link
@@ -72,12 +93,12 @@ const Sidebar = () => {
                 </Typography>
 
                 {/* name */}
-                <Typography
+                {!isMini && <Typography
                   className="typoSubtitle2"
                   style={{ color: activeColor(route) }}
                 >
                   {route.name}
-                </Typography>
+                </Typography>}
               </Link>
             ))}
 
@@ -94,7 +115,7 @@ const Sidebar = () => {
               </Typography>
 
               {/* name */}
-              <Typography className="typoSubtitle2">Sign out</Typography>
+              {!isMini&&<Typography className="typoSubtitle2">Sign out</Typography>}
             </Link>
           </Box>
         </div>

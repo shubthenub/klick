@@ -55,15 +55,11 @@ function getSupabaseClient() {
 
 export async function GET(req, { params }) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
+    const { userId } = await auth(); // Clerk auth middleware handles cookie verification
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const token = authHeader.replace("Bearer ", "").trim();
-    const decodedToken = verifyClerkToken(token);
-    const userId = decodedToken.sub;
-    const supabase = getSupabaseWithToken(token);
     const { followerId: otherUserId } = await params;
 
     const chat = await createOrGetChat(userId, otherUserId);
@@ -78,10 +74,11 @@ export async function GET(req, { params }) {
 
     return NextResponse.json({ chat, messages });
   } catch (error) {
-    console.error("GET /api/messages error:", error.message);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    console.error("GET /api/messages error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
 
 export async function POST(req, { params }) {
   try {

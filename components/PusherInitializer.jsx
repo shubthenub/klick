@@ -6,10 +6,10 @@ import { initializePusher } from "@/utils/initializePusher";
 
 const PusherInitializer = () => {
   const { pusherClient, setPusherClient, setOnlineUsers } = useContext(SettingsContext);
-  const { getToken } = useAuth();
+  // const { getToken } = useAuth();
 
   useEffect(() => {
-    initializePusher({ getToken, setPusherClient, setOnlineUsers });
+    initializePusher({ setPusherClient, setOnlineUsers });
 
     return () => {
       if (pusherClient) {

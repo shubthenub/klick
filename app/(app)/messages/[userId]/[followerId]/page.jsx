@@ -62,11 +62,8 @@ export default function ChatPage() {
   const isDark = settings.theme === "dark";
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 0);
-    return () => clearTimeout(timeout);
-  }, [messages]);
+  messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+}, [messages]);
 
   const getMediaType = (url) => {
     if (/\.(jpeg|jpg|png|gif|webp)$/i.test(url)) return "image";
@@ -75,34 +72,40 @@ export default function ChatPage() {
   };
 
   const loadMessages = async () => {
-    if (!followerId) return;
-    try {
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/messages/${followerId}`, {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setChatId(data.chat?.id || null);
-      // setMessages(data.messages || []);
-      const parsedMessages = (data.messages || []).map((msg) => {
-        const mediaType = getMediaType(msg.content);
-        return {
-          ...msg,
-          type: mediaType === "text" ? msg.type || "text" : "media",
-          mediaFormat: mediaType !== "text" ? mediaType : undefined,
-        };
-      });
-      setMessages(parsedMessages);
+  if (!followerId) return;
 
-      updateLastMessage(
-        data.chat?.id,
-        data.messages?.[data.messages.length - 1]
-      );
-    } catch (error) {
-      console.error("Failed to load messages:", error);
+  try {
+    const res = await fetch(`/api/messages/${followerId}`, {
+      credentials: "include", // 🔐 Important for sending Clerk cookies
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch messages: ${res.status}`);
     }
-  };
+
+    const data = await res.json();
+    setChatId(data.chat?.id || null);
+
+    const parsedMessages = (data.messages || []).map((msg) => {
+      const mediaType = getMediaType(msg.content);
+      return {
+        ...msg,
+        type: mediaType === "text" ? msg.type || "text" : "media",
+        mediaFormat: mediaType !== "text" ? mediaType : undefined,
+      };
+    });
+
+    setMessages(parsedMessages);
+
+    updateLastMessage(
+      data.chat?.id,
+      data.messages?.[data.messages.length - 1]
+    );
+  } catch (error) {
+    console.error("Failed to load messages:", error);
+  }
+};
+
 
   const getReceiver = async () => {
     if (!followerId) return;
@@ -162,7 +165,7 @@ export default function ChatPage() {
     });
 
     channel.bind("pusher:subscription_error", async () => {
-      await initializePusher({ getToken, setPusherClient, setOnlineUsers });
+      await initializePusher({ setPusherClient, setOnlineUsers });
     });
 
     return () => {

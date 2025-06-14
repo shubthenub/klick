@@ -1,15 +1,11 @@
 import Pusher from "pusher-js";
 
-export const initializePusher = async ({ getToken, setPusherClient, setOnlineUsers }) => {
-  const token = await getToken({ skipCache: true });
-
+export const initializePusher = async ({ setPusherClient, setOnlineUsers }) => {
   const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
     authEndpoint: "/api/pusher/auth",
     auth: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include", // Send Clerk cookies instead of token
     },
     forceTLS: true,
   });
@@ -32,5 +28,5 @@ export const initializePusher = async ({ getToken, setPusherClient, setOnlineUse
   });
 
   setPusherClient(pusher);
-  return pusher; // return in case you need it for cleanup later
+  return pusher;
 };

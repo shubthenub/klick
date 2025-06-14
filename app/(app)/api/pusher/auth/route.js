@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Pusher from 'pusher';
 import jwt from 'jsonwebtoken';
+import { auth } from '@clerk/nextjs/server';
 
 const pusher = new Pusher({
   appId: process.env.PUSHER_APP_ID,
@@ -34,6 +35,7 @@ function verifyClerkToken(token) {
   return decoded;
 }
 
+
 export async function POST(req) {
   try {
     const formData = await req.formData();
@@ -47,25 +49,19 @@ export async function POST(req) {
       );
     }
 
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
+    const { userId } = await auth();
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.replace('Bearer ', '').trim();
-    const decodedToken = verifyClerkToken(token);
-    const userId = decodedToken.sub;
-
-    // Add presence channel auth logic here
+    // ✅ Use Clerk's session to get userId (no need for token decoding)
     let authResponse;
     if (channel_name.startsWith('presence-')) {
-      // Presence channel requires user_id and user_info
       authResponse = pusher.authorizeChannel(socket_id, channel_name, {
         user_id: userId,
-        
+        user_info: { id: userId }, // You can attach more info here if needed
       });
     } else {
-      // Private or other channels
       authResponse = pusher.authorizeChannel(socket_id, channel_name);
     }
 

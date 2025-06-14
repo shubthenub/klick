@@ -13,7 +13,8 @@ const pusher = new Pusher({
 const permittedOrigins = [
   'http://localhost:3000',
   'https://cheaply-touching-clam.ngrok-free.app',
-  'https://klicktest.loophole.site'
+  'https://klicktest.loophole.site',
+  'https://klick-one.vercel.app'
 ];
 
 function verifyClerkToken(token) {

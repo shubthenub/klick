@@ -10,6 +10,7 @@ import Sidebar from "@/components/Sidebar";
 import { ToastProvider } from "@/lib/ThemeProvider/ToastProvider"; // Import the new ToastProvider
 import { HydrationBoundary, QueryClient, QueryClientProvider, dehydrate } from "@tanstack/react-query";
 import { App } from "antd";
+import PusherInitializer from "@/components/PusherInitializer";
 
 const queryClient = new QueryClient(); // Ensure QueryClient is created on the client side
 
@@ -19,6 +20,7 @@ const HomeLayout = ({ children }) => {
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <HydrationBoundary state={dehydrate(queryClient)}>
+            <PusherInitializer/>
             <App>
               <Box
                 type="baseBg"

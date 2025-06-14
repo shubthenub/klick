@@ -55,10 +55,18 @@ export async function POST(req) {
     const decodedToken = verifyClerkToken(token);
     const userId = decodedToken.sub;
 
-    const authResponse = pusher.authorizeChannel(socket_id, channel_name, {
-      user_id: userId,
-      user_info: { name: userId },
-    });
+    // Add presence channel auth logic here
+    let authResponse;
+    if (channel_name.startsWith('presence-')) {
+      // Presence channel requires user_id and user_info
+      authResponse = pusher.authorizeChannel(socket_id, channel_name, {
+        user_id: userId,
+        
+      });
+    } else {
+      // Private or other channels
+      authResponse = pusher.authorizeChannel(socket_id, channel_name);
+    }
 
     return NextResponse.json(authResponse);
   } catch (error) {

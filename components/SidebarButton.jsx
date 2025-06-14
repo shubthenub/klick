@@ -17,7 +17,9 @@ const SidebarButton = () => {
   }, [width]);
   return (
     <Button
-      visible={isvisible}
+      style={{
+        display: isvisible ? "block" : "none",
+      }}
       type="text"
       onClick={() => {
         setSettings((prev) => ({

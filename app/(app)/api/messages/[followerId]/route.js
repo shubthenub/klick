@@ -4,9 +4,10 @@ import prisma from "@/lib/prisma";
 import { createOrGetChat } from "@/lib/createOrGetChat";
 import { createClient } from "@supabase/supabase-js";
 import Pusher from "pusher";
+import { auth, currentUser } from '@clerk/nextjs/server'
 
 const publicKey = process.env.CLERK_PEM_PUBLIC_KEY;
-console.log(publicKey)
+// console.log(publicKey)
 
 const permittedOrigins = [
   'http://localhost:3000',
@@ -44,6 +45,13 @@ function getSupabaseWithToken(token) {
     }
   );
 }
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    
+  );
+}
 
 export async function GET(req, { params }) {
   try {
@@ -77,19 +85,14 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const token = authHeader.replace("Bearer ", "").trim();
-    const decodedToken = verifyClerkToken(token);
-    const userId = decodedToken.sub;
-    const supabase = getSupabaseWithToken(token);
     const { followerId: otherUserId } = await params;
     const body = await req.json();
+    const content = body?.content?.trim();
 
-    if (!body?.content?.trim()) {
+    if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
@@ -98,19 +101,16 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
-    const message = await prisma.message.create({
-      data: {
-        chatId: chat.id,
-        senderId: userId,
-        content: body.content,
-      },
-    });
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`, // Just to prevent missing ID for clients
+      chatId: chat.id,
+      senderId: userId,
+      content,
+      createdAt: new Date().toISOString(),
+      type: body.type || "text",
+    };
 
-    const { error } = await supabase.from("messages").insert([message]);
-    if (error) {
-      console.error("Supabase insert error:", error);
-    }
-
+    // ✅ Trigger Pusher first
     const pusher = new Pusher({
       appId: process.env.PUSHER_APP_ID,
       key: process.env.NEXT_PUBLIC_PUSHER_KEY,
@@ -119,13 +119,30 @@ export async function POST(req, { params }) {
       useTLS: true,
     });
 
-    await pusher.trigger(`private-chat-${chat.id}`, 'new-message', {
-      message,
+    pusher.trigger(`private-chat-${chat.id}`, "new-message", {
+      message: optimisticMessage,
     });
 
-    return NextResponse.json(message);
+    // ✅ Save to Prisma and Supabase in the background (not awaited)
+    prisma.message
+      .create({
+        data: {
+          chatId: chat.id,
+          senderId: userId,
+          content,
+        },
+      })
+      // .then(async (message) => {
+      //   const supabase = getSupabaseClient();
+      //   const { error } = await supabase.from("messages").insert([message]);
+      //   if (error) console.error("Supabase insert error:", error);
+      // })
+      .catch((err) => console.error("DB write failed:", err));
+
+    // Respond immediately
+    return NextResponse.json(optimisticMessage);
   } catch (error) {
-    console.error("POST /api/messages error:", error.message);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    console.error("POST /api/messages error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

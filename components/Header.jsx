@@ -1,3 +1,4 @@
+"use client"
 import React from 'react'
 import css from '@/styles/header.module.css';
 import Box from './Box/Box';

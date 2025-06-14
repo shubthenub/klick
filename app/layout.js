@@ -5,6 +5,8 @@ import { ClerkProvider, RedirectToSignIn } from '@clerk/nextjs';
 import { ClerkLoaded } from '@clerk/nextjs';
 import "@/styles/typography.css";
 import QueryProvider from "@/lib/QueryProvider";
+import PusherInitializer from "@/components/PusherInitializer";
+import { SettingsContextProvider } from '@/context/settings/settings-provider';
 
 const PublicSans = Public_Sans({
   subsets: ["latin"],
@@ -12,7 +14,7 @@ const PublicSans = Public_Sans({
 })
 
 export const metadata = {
-  title: "Social",
+  title: "Klick",
   description: "Connect with people online",
 };
 
@@ -26,6 +28,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
+    
     <ClerkProvider
     appearance={{
       signIn: {
@@ -38,7 +41,13 @@ export default function RootLayout({ children }) {
       <html lang="en">
       <body className="{publicSans}">
         <QueryProvider>
-        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
+        <StyledComponentsRegistry>
+          <SettingsContextProvider>
+            
+          
+          {children}
+          </SettingsContextProvider>
+          </StyledComponentsRegistry>
         </QueryProvider>
         
       </body>

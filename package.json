@@ -22,6 +22,7 @@
     "antd": "^5.11.5",
     "cloudinary": "^2.5.1",
     "dayjs": "^1.11.13",
+    "emoji-picker-react": "^4.12.2",
     "framer-motion": "^12.4.3",
     "jsonwebtoken": "^9.0.2",
     "next": "15.1.3",

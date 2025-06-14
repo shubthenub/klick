@@ -4,14 +4,17 @@ import { useEffect, useState, useRef, useContext } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@clerk/nextjs";
-import Pusher from "pusher-js";
-import css from "@/styles/chatpage.module.css"; // Assuming you have a CSS module for styles
+import css from "@/styles/chatpage.module.css";
 import ChatInput from "@/components/ChatInput";
-import { Button, Flex, Input } from "antd";
+import { Button, Flex, Input, Image } from "antd";
 import { Icon } from "@iconify/react";
 import Avatar from "antd/es/avatar/avatar";
 import { getUser } from "@/actions/user";
 import { SettingsContext } from "@/context/settings/settings-context";
+import { initializePusher } from "@/utils/initializePusher";
+import silentRefresh from "@/utils/silentRefresh";
+import MediaUploadButton from "@/components/MediaUploadButton";
+import EmojiPicker from "emoji-picker-react";
 
 export default function ChatPage() {
   const { followerId } = useParams();
@@ -20,13 +23,44 @@ export default function ChatPage() {
   const [text, setText] = useState("");
   const messagesEndRef = useRef(null);
   const { getToken, userId } = useAuth();
-  const pusherRef = useRef(null);
-  const channelRef = useRef(null);
   const [receiver, setReceiver] = useState({});
-  const { settings } = useContext(SettingsContext);
+  const [pendingMedia, setPendingMedia] = useState([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiOpenRef = useRef(null);
+  const [mediaPreviews, setMediaPreviews] = useState([]); // array of { loading: true } or { url, type }
+
+
+  // useState for emoji picker hiding when outside click
+  useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (emojiOpenRef.current && !emojiOpenRef.current.contains(event.target)) {
+      setShowEmojiPicker(false);
+    }
+  };
+
+  if (showEmojiPicker) {
+    document.addEventListener("mousedown", handleClickOutside);
+  } else {
+    document.removeEventListener("mousedown", handleClickOutside);
+  }
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, [showEmojiPicker]);
+
+
+
+  const {
+    settings,
+    pusherClient,
+    setPusherClient,
+    setOnlineUsers,
+    onlineUsers,
+    updateLastMessage,
+  } = useContext(SettingsContext);
   const isDark = settings.theme === "dark";
 
-  // Scroll to bottom when messages update
   useEffect(() => {
     const timeout = setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,181 +68,212 @@ export default function ChatPage() {
     return () => clearTimeout(timeout);
   }, [messages]);
 
-  // Load messages from API
+  const getMediaType = (url) => {
+    if (/\.(jpeg|jpg|png|gif|webp)$/i.test(url)) return "image";
+    if (/\.(mp4|webm|mov)$/i.test(url)) return "video";
+    return "text";
+  };
+
   const loadMessages = async () => {
     if (!followerId) return;
     try {
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/messages/${followerId}`, {
         credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setChatId(data.chat?.id || null);
-      setMessages(data.messages || []);
-      console.log(
-        "[loadMessages] Loaded messages:",
-        data.messages?.length || 0
+      // setMessages(data.messages || []);
+      const parsedMessages = (data.messages || []).map((msg) => {
+        const mediaType = getMediaType(msg.content);
+        return {
+          ...msg,
+          type: mediaType === "text" ? msg.type || "text" : "media",
+          mediaFormat: mediaType !== "text" ? mediaType : undefined,
+        };
+      });
+      setMessages(parsedMessages);
+
+      updateLastMessage(
+        data.chat?.id,
+        data.messages?.[data.messages.length - 1]
       );
     } catch (error) {
-      console.error("[loadMessages] Failed to load messages:", error);
+      console.error("Failed to load messages:", error);
     }
   };
 
-  // Fetch receiver details
   const getReceiver = async () => {
     if (!followerId) return;
     const user = await getUser(followerId);
-    if (user) {
-      setReceiver(user);
-      console.log("Fetched Receiver:", user);
-    } else {
-      console.error("Receiver not found for followerId:", followerId);
-    }
+    if (user) setReceiver(user);
   };
 
-  // Initial message load
   useEffect(() => {
     loadMessages();
     getReceiver();
   }, [followerId]);
 
-  // Setup Pusher connection and channel subscription
   useEffect(() => {
-    if (!chatId || !userId) return;
+    if (!chatId || !pusherClient) return;
+    const channelName = `private-chat-${chatId}`;
+    const channel = pusherClient.subscribe(channelName);
 
-    const initializePusher = async () => {
-      try {
-        const token = await getToken();
-
-        pusherRef.current = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
-          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-          authEndpoint: "/api/pusher/auth",
-          auth: {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-          forceTLS: true,
-        });
-
-        const channelName = `private-chat-${chatId}`;
-        channelRef.current = pusherRef.current.subscribe(channelName);
-
-        channelRef.current.bind("new-message", (data) => {
-  console.log("New message received via Pusher:", data);
-  const incomingMessage = data.message;
-
-  setMessages(prevMessages => {
-    const index = prevMessages.findIndex(
-      (m) =>
-        m.status === "pending" &&
-        m.content === incomingMessage.content &&
-        m.senderId === incomingMessage.senderId &&
-        Math.abs(new Date(m.createdAt) - new Date(incomingMessage.createdAt)) < 5000 // close enough
-    );
-
-    let updatedMessages;
-    if (index !== -1) {
-      // Replace pending message with actual one
-      updatedMessages = [...prevMessages];
-      updatedMessages[index] = incomingMessage;
-    } else {
-      // Append new message
-      updatedMessages = [...prevMessages, incomingMessage];
-    }
-
-    // Sort only the last 10 messages by createdAt
-    if (updatedMessages.length <= 10) {
-      return updatedMessages.sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-      );
-    }
-
-    const splitIndex = updatedMessages.length - 10;
-    const firstPart = updatedMessages.slice(0, splitIndex);
-    const lastTen = updatedMessages.slice(splitIndex);
-
-    lastTen.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-    return [...firstPart, ...lastTen];
-  });
-});
-
-
-        channelRef.current.bind("pusher:subscription_error", (status) => {
-          console.error("Pusher subscription error:", status);
-        });
-
-        channelRef.current.bind("pusher:subscription_succeeded", () => {
-          console.log("Successfully subscribed to channel:", channelName);
-        });
-      } catch (error) {
-        console.error("Pusher initialization error:", error);
+    channel.bind("new-message", (data) => {
+      let incomingMessage = data.message;
+      const mediaType = getMediaType(incomingMessage.content);
+      if (!incomingMessage.type || incomingMessage.type === "text") {
+        incomingMessage = {
+          ...incomingMessage,
+          type: mediaType !== "text" ? "media" : "text",
+          mediaFormat: mediaType !== "text" ? mediaType : undefined,
+        };
       }
-    };
 
-    initializePusher();
+      setMessages((prev) => {
+        const index = prev.findIndex(
+          (m) =>
+            m.status === "pending" &&
+            m.content === incomingMessage.content &&
+            m.senderId === incomingMessage.senderId &&
+            Math.abs(
+              new Date(m.createdAt) - new Date(incomingMessage.createdAt)
+            ) < 6000
+        );
+
+        let updated = [...prev];
+        if (index !== -1) updated[index] = incomingMessage;
+        else updated.push(incomingMessage);
+
+        if (updated.length <= 10)
+          return updated.sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+          );
+
+        const splitIndex = updated.length - 10;
+        const first = updated.slice(0, splitIndex);
+        const lastTen = updated
+          .slice(splitIndex)
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+        return [...first, ...lastTen];
+      });
+    });
+
+    channel.bind("pusher:subscription_error", async () => {
+      await initializePusher({ getToken, setPusherClient, setOnlineUsers });
+    });
 
     return () => {
-      if (channelRef.current) {
-        channelRef.current.unbind_all();
-        channelRef.current.unsubscribe();
-      }
-      if (pusherRef.current) {
-        pusherRef.current.disconnect();
-      }
+      channel.unbind("new-message");
+      pusherClient.unsubscribe(channelName);
     };
-  }, [chatId, userId, getToken]);
+  }, [chatId, pusherClient]);
 
-  // Send message
   const sendMessage = async () => {
-    if (!text.trim() || !chatId) return;
+  if (!chatId) return;
 
-    // When sending:
+  // 2. No longer need to fetch the token!
+  // const token = await getToken({ skipCache: true });
+
+  const trimmedText = text.trim();
+  const hasMedia = pendingMedia.length > 0;
+  const hasText = trimmedText.length > 0;
+
+  if (!hasMedia && !hasText) return;
+
+  const mediaToSend = [...pendingMedia];
+  setPendingMedia([]);
+  setText("");
+
+  const sendPromises = [];
+
+  // Send media messages
+  if (hasMedia) {
+    for (const media of mediaToSend) {
+      // ... (optimistic UI code remains the same)
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const newMessage = {
+        id: tempId, chatId, senderId: userId, content: media.url,
+        type: "media", status: "pending", createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, newMessage]);
+
+      sendPromises.push(
+        fetch(`/api/messages/${followerId}`, {
+          method: "POST",
+          // credentials: 'include' is crucial. It tells the browser to send cookies.
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            // 3. Authorization header is removed.
+          },
+          body: JSON.stringify({ content: media.url, type: "media" }),
+        })
+      );
+    }
+  }
+
+  // Send text message
+  if (hasText) {
+    // ... (optimistic UI code remains the same)
     const tempId = `temp-${Date.now()}`;
     const newMessage = {
-      id: tempId,
-      chatId,
-      senderId: userId,
-      content: text,
-      status: "pending",
-      createdAt: new Date().toISOString(),
+      id: tempId, chatId, senderId: userId, content: trimmedText,
+      type: "text", status: "pending", createdAt: new Date().toISOString(),
     };
-
     setMessages((prev) => [...prev, newMessage]);
 
-    const currentText = text;
-    setText("");
-
-    try {
-      const token = await getToken();
-      await fetch(`/api/messages/${followerId}`, {
+    sendPromises.push(
+      fetch(`/api/messages/${followerId}`, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+           // 3. Authorization header is removed.
         },
-        body: JSON.stringify({ content: currentText }),
-      });
+        body: JSON.stringify({ content: trimmedText, type: "text" }),
+      })
+    );
+  }
 
-      console.log("[sendMessage] Message sent successfully");
-    } catch (error) {
-      console.error("[sendMessage] Failed to send message:", error);
-      // Optionally, you can update this message's status to failed here
-    }
-  };
+  try {
+    await Promise.all(sendPromises);
+  } catch (err) {
+    console.error("One or more messages failed to send:", err);
+  }
+};
+
+
+
+
+  silentRefresh(() => {
+    loadMessages();
+  });
+
+  if (!pusherClient || !userId) {
+    return (
+      <div
+        className={css.container}
+        style={{
+          height: "86vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <p style={{ color: isDark ? "#ccc" : "#666" }}>
+          Loading chat... Please wait.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
       className={css.container}
-      style={{
-        height: "86vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
+      style={{ height: "86vh", display: "flex", flexDirection: "column" }}
     >
       <div
         className={css.chatHeader}
@@ -219,7 +284,23 @@ export default function ChatPage() {
         }}
       >
         <Flex align="center" gap="1rem">
-          <Avatar src={receiver?.data?.image_url} size={40} />
+          <div style={{ position: "relative" }}>
+            <Avatar src={receiver?.data?.image_url} size={40} />
+            {onlineUsers.includes(receiver?.data?.id) && (
+              <span
+                className={css.onlineIndicator}
+                style={{
+                  backgroundColor: "#00ff00",
+                  position: "absolute",
+                  bottom: "5%",
+                  right: "3px",
+                  height: "7px",
+                  width: "7px",
+                  borderRadius: "50%",
+                }}
+              ></span>
+            )}
+          </div>
           <div>
             <h3 style={{ margin: 0 }}>
               {receiver?.data?.first_name} {receiver?.data?.last_name}
@@ -231,16 +312,10 @@ export default function ChatPage() {
         </Flex>
       </div>
 
-      {/* Scrollable Messages */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "1rem",
-        }}
-      >
+      <div style={{ flex: 1, overflowY: "auto", padding: "1rem" }}>
         {messages.map((msg) => {
           const isFromCurrentUser = msg.senderId === userId;
+          const mediaType = msg.mediaFormat || getMediaType(msg.content);
 
           return (
             <div
@@ -259,38 +334,171 @@ export default function ChatPage() {
               {!isFromCurrentUser && (
                 <Avatar src={receiver?.data?.image_url} size={30} />
               )}
-              <p
-                className={css.message}
+              <div
                 style={{
                   maxWidth: "50%",
                   padding: "0.75rem 1rem",
                   borderRadius: "1.5rem",
                   backgroundColor: isDark ? "#1a1a1a" : "#f2f2f2",
                   fontSize: "0.95rem",
-                  lineHeight: "1.4",
                   wordBreak: "break-word",
                   whiteSpace: "pre-wrap",
                   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
                   color: isDark ? "#f2f2f2" : "#1a1a1a",
                 }}
               >
-                {msg.content}
-              </p>
+                {mediaType === "image" ? (
+                  <Image
+                    src={msg.content}
+                    alt="Media"
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: "12px",
+                      maxHeight: "200px",
+                    }}
+                  />
+                ) : mediaType === "video" ? (
+                  <video
+                    src={msg.content}
+                    controls
+                    autoPlay={false}
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: "12px",
+                      maxHeight: "200px",
+                    }}
+                  />
+                ) : (
+                  msg.content
+                )}
+              </div>
             </div>
           );
         })}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input box fixed at the bottom */}
+      {/* actions box  */}
       <div
         style={{
           padding: "0.75rem",
           borderTop: `1px solid ${isDark ? "rgb(91, 87, 87)" : "#e1e1e1"}`,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <Flex align="center" gap="1rem">
+        {/* media preview */}
+        {pendingMedia.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: "1rem",
+              flexWrap: "wrap",
+              marginBottom: "0.5rem",
+              padding: "0.5rem",
+              background: isDark ? "#121212" : "#f9f9f9",
+              borderRadius: "8px",
+            }}
+          >
+            {pendingMedia.map((file, index) => (
+              <div
+                key={index}
+                style={{
+                  position: "relative",
+                  maxWidth: "120px",
+                }}
+              >
+                <span
+                  onClick={() =>
+                    setPendingMedia((prev) =>
+                      prev.filter((_, i) => i !== index)
+                    )
+                  }
+                  style={{
+                    position: "absolute",
+                    top: "-6px",
+                    right: "-6px",
+                    background: "#ff4d4f",
+                    color: "white",
+                    borderRadius: "50%",
+                    cursor: "pointer",
+                    width: "20px",
+                    height: "20px",
+                    textAlign: "center",
+                    fontSize: "12px",
+                    lineHeight: "20px",
+                    zIndex: 1,
+                  }}
+                >
+                  ✕
+                </span>
+                {file.type === "image" ? (
+                  <Image
+                    src={file.url}
+                    alt="preview"
+                    style={{
+                      borderRadius: "6px",
+                      maxWidth: "100%",
+                      maxHeight: "100px",
+                    }}
+                  />
+                ) : (
+                  <video
+                    src={file.url}
+                    controls
+                    style={{
+                      borderRadius: "6px",
+                      maxWidth: "100%",
+                      maxHeight: "100px",
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+      {/* input options  */}
+        <Flex align="center" gap="1rem" style={{ width: "100%" }}>
+          <MediaUploadButton
+            onUpload={(urls) => {
+              const newMedia = urls.map((url) => ({
+                url,
+                type: getMediaType(url),
+              }));
+              setPendingMedia((prev) => [...prev, ...newMedia]);
+            }}
+          />
+
+          {/* === Emoji Picker Button === */}
+          <div style={{ position: "relative" }} 
+            ref={emojiOpenRef}>
+            <Button
+              icon={<Icon icon="twemoji:smiling-face-with-smiling-eyes" />}
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: "1.25rem",
+                cursor: "pointer",
+              }}
+            />
+            {showEmojiPicker && (
+              <div
+                style={{ position: "absolute", bottom: "50px", zIndex: 100 }}
+              >
+                <EmojiPicker
+                  theme={isDark ? "dark" : "light"}
+                  onEmojiClick={(emojiData) =>
+                    setText((prev) => prev + emojiData.emoji)
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          {/* text input */}
           <Input.TextArea
             variant="borderless"
             autoSize={{ minRows: 1, maxRows: 4 }}
@@ -303,20 +511,12 @@ export default function ChatPage() {
                 sendMessage();
               }
             }}
-            style={{
-              resize: "none",
-              height: "1rem",
-              flex: 1,
-              // borderRadius: 8,
-              // borderColor: isDark ? "#555" : "#ccc",
-              // backgroundColor: isDark ? "#2a2a2a" : "#fff",
-              // color: isDark ? "#fff" : "#000",
-            }}
+            style={{ resize: "none", flex: 1 }}
           />
           <Button
             type="primary"
-            onClick={sendMessage}
-            disabled={!text.trim()}
+            onClick={() => sendMessage()}
+            disabled={!text.trim() && pendingMedia.length === 0}
             icon={<Icon icon="ic:round-send" />}
           />
         </Flex>

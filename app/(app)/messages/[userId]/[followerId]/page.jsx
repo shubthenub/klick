@@ -15,6 +15,7 @@ import { initializePusher } from "@/utils/initializePusher";
 import silentRefresh from "@/utils/silentRefresh";
 import MediaUploadButton from "@/components/MediaUploadButton";
 import EmojiPicker from "emoji-picker-react";
+import { v4 as uuidv4 } from "uuid"; // or use cuid()
 
 export default function ChatPage() {
   const { followerId } = useParams();
@@ -122,6 +123,11 @@ export default function ChatPage() {
     if (!chatId || !pusherClient) return;
     const channelName = `private-chat-${chatId}`;
     const channel = pusherClient.subscribe(channelName);
+    console.log("subscribed to channel:", channelName);
+    channel.bind("pusher:subscription_error", (err) => {
+        console.error("Subscription error:", err);
+      });
+
 
     channel.bind("new-message", (data) => {
       let incomingMessage = data.message;
@@ -136,18 +142,19 @@ export default function ChatPage() {
 
       setMessages((prev) => {
         const index = prev.findIndex(
-          (m) =>
-            m.status === "pending" &&
-            m.content === incomingMessage.content &&
-            m.senderId === incomingMessage.senderId &&
-            Math.abs(
-              new Date(m.createdAt) - new Date(incomingMessage.createdAt)
-            ) < 6000
-        );
+          (m) => m.id === incomingMessage.id
+        );//fix vercel not working on pending messages
 
         let updated = [...prev];
-        if (index !== -1) updated[index] = incomingMessage;
-        else updated.push(incomingMessage);
+        if (index !== -1) {
+          updated[index] = {
+            ...incomingMessage,
+            status: "sent", // mark it sent
+          };
+        } else {
+          updated.push({ ...incomingMessage, status: "sent" });
+        }
+
 
         if (updated.length <= 10)
           return updated.sort(
@@ -195,10 +202,11 @@ export default function ChatPage() {
   // Send media messages
   if (hasMedia) {
     for (const media of mediaToSend) {
+      const msgMediaId = uuidv4();
       // ... (optimistic UI code remains the same)
-      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      // const tempId = `temp-${Date.now()}-${Math.random()}`;
       const newMessage = {
-        id: tempId, chatId, senderId: userId, content: media.url,
+        id: msgMediaId, chatId, senderId: userId, content: media.url,
         type: "media", status: "pending", createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, newMessage]);
@@ -212,7 +220,7 @@ export default function ChatPage() {
             "Content-Type": "application/json",
             // 3. Authorization header is removed.
           },
-          body: JSON.stringify({ content: media.url, type: "media" }),
+          body: JSON.stringify({ content: media.url, type: "media" , id: msgMediaId }),
         })
       );
     }
@@ -220,10 +228,11 @@ export default function ChatPage() {
 
   // Send text message
   if (hasText) {
+    const msgId = uuidv4();
     // ... (optimistic UI code remains the same)
-    const tempId = `temp-${Date.now()}`;
+    // const tempId = `temp-${Date.now()}`;
     const newMessage = {
-      id: tempId, chatId, senderId: userId, content: trimmedText,
+      id: msgId, chatId, senderId: userId, content: trimmedText,
       type: "text", status: "pending", createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, newMessage]);
@@ -236,7 +245,7 @@ export default function ChatPage() {
           "Content-Type": "application/json",
            // 3. Authorization header is removed.
         },
-        body: JSON.stringify({ content: trimmedText, type: "text" }),
+        body: JSON.stringify({ content: trimmedText, type: "text", id: msgId }),
       })
     );
   }

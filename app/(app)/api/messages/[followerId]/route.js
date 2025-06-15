@@ -87,7 +87,9 @@ export async function POST(req, { params }) {
 
     const { followerId: otherUserId } = await params;
     const body = await req.json();
-    const content = body?.content?.trim();
+    const { id, content, type } = body;
+
+    // content = body?.content?.trim();
 
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -99,7 +101,7 @@ export async function POST(req, { params }) {
     }
 
     const optimisticMessage = {
-      id: `temp-${Date.now()}`, // Just to prevent missing ID for clients
+      id, // Use the provided ID for optimistic updates
       chatId: chat.id,
       senderId: userId,
       content,
@@ -116,14 +118,16 @@ export async function POST(req, { params }) {
       useTLS: true,
     });
 
-    pusher.trigger(`private-chat-${chat.id}`, "new-message", {
+    pusher.trigger(`private-chat-${chat?.id}`, "new-message", {
       message: optimisticMessage,
     });
+    console.log("triggered pusher for new message:", optimisticMessage);
 
     // ✅ Save to Prisma and Supabase in the background (not awaited)
     prisma.message
       .create({
         data: {
+          id, //for seen status change we manually provide the ID
           chatId: chat.id,
           senderId: userId,
           content,

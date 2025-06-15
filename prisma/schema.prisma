@@ -93,7 +93,7 @@ model ChatParticipant {
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String   @id 
   chat       Chat     @relation(fields: [chatId], references: [id])
   chatId     String
   sender     User     @relation("MessageSender", fields: [senderId], references: [id])
@@ -102,4 +102,20 @@ model Message {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+model Seen {
+  id       String   @id         // This will store the ID of the resource (post/message/notification)
+  type     SeenType             // Enum: "POST", "MESSAGE", "NOTIFICATION"
+  seenBy   String               // User ID
+  seenAt   DateTime @default(now())
+
+  @@unique([id, type, seenBy]) // Prevent duplicates
+}
+
+enum SeenType {
+  POST
+  MESSAGE
+  NOTIFICATION
+}
+
 

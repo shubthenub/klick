@@ -227,35 +227,31 @@ export default function ChatPage() {
 
       const incomingMessage = {
         ...incomingMessageRaw,
-        type:
-          incomingMessageRaw.type || (mediaType !== "text" ? "media" : "text"),
+        type: incomingMessageRaw.type || (mediaType !== "text" ? "media" : "text"),
         mediaFormat: mediaType !== "text" ? mediaType : undefined,
-        status: "sent",
         createdAt: incomingMessageRaw.createdAt || new Date().toISOString(),
+        status: "sent",
       };
 
       setMessages((prevMessages) => {
-        const existingIndex = prevMessages.findIndex(
-          (m) => m.id === incomingMessage.id
-        );
+        const existingIndex = prevMessages.findIndex((m) => m.id === incomingMessage.id);
         const updated = [...prevMessages];
 
         if (existingIndex !== -1) {
           updated[existingIndex] = {
-            ...incomingMessage, // real message from Pusher takes priority
-            // Preserve any local-only fields if needed
+            ...updated[existingIndex],
+            ...incomingMessage,
+            status: "sent", // ✅ force override
           };
         } else {
           updated.push(incomingMessage);
         }
 
-        // If more than 10 messages, only keep latest 10 at the end
-        const lastTen = updated
+        return updated
           .slice(-10)
-          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-        return [...updated.slice(0, updated.length - 10), ...lastTen];
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       });
+
     };
 
     const handleMessageSeen = ({ messageId, seenBy }) => {

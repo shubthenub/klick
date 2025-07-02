@@ -174,7 +174,7 @@ export async function POST(req, { params }) {
 
 
     // 2. Trigger pusher immediately
-    pusher.trigger(`private-chat-${chatId}`, "new-message", {
+    await pusher.trigger(`private-chat-${chatId}`, "new-message", {
       id,
       chatId: chatId,
       senderId: userId,

@@ -162,7 +162,7 @@ export async function POST(req, { params }) {
     const createdAt= new Date().toISOString()
 
     // 1. Store in Redis
-    await redisSet(`message:${id}`, {
+    const redisPromise= redisSet(`message:${id}`, {
       id,
       chatId: chatId,
       senderId: userId,
@@ -174,7 +174,7 @@ export async function POST(req, { params }) {
 
 
     // 2. Trigger pusher immediately
-    await pusher.trigger(`private-chat-${chatId}`, "new-message", {
+    const pusherPromise= pusher.trigger(`private-chat-${chatId}`, "new-message", {
       id,
       chatId: chatId,
       senderId: userId,
@@ -187,7 +187,7 @@ export async function POST(req, { params }) {
     });
 
     // 3. THEN add to queue (this is backend-only, not user-facing)
-    await messageQueue.add("persist-message", {
+    const queuePromise= messageQueue.add("persist-message", {
       id,
       chatId: chatId,
       senderId: userId,
@@ -202,6 +202,7 @@ export async function POST(req, { params }) {
         },
       }
   );
+  await Promise.all([redisPromise, pusherPromise, queuePromise]);
 
   return NextResponse.json({
     id,

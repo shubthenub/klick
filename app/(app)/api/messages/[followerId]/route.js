@@ -5,7 +5,16 @@ import { createOrGetChat } from "@/lib/createOrGetChat";
 import { createClient } from "@supabase/supabase-js";
 import Pusher from "pusher";
 import { auth, currentUser } from '@clerk/nextjs/server'
+import { pusher } from "@/lib/pusher";
+import { redisSet } from "@/lib/redisSet";
+import { Queue } from "bullmq";
+import Redis from "ioredis";
 
+const connection = new Redis(process.env.REDIS_URL,{
+  maxRetriesPerRequest: null,
+  tls: {}, // optional, but recommended for rediss://
+});
+const messageQueue = new Queue("messages", { connection });
 const publicKey = process.env.CLERK_PEM_PUBLIC_KEY;
 // console.log(publicKey)
 
@@ -55,24 +64,74 @@ function getSupabaseClient() {
 
 export async function GET(req, { params }) {
   try {
-    const { userId } = await auth(); // Clerk auth middleware handles cookie verification
+    const { userId } = await auth(); 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { followerId: otherUserId } = await params;
+    const { followerId: otherUserId } = params;
+    const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const beforeId = searchParams.get("before");
 
     const chat = await createOrGetChat(userId, otherUserId);
     if (!chat) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
+    // Build dynamic where clause
+    let whereClause = {
+      chatId: chat.id,
+    };
+
+    if (beforeId) {
+      const beforeMsg = await prisma.message.findUnique({
+        where: { id: beforeId },
+        select: { createdAt: true },
+      });
+
+      if (beforeMsg) {
+        whereClause.createdAt = { lt: beforeMsg.createdAt };
+      }
+    }
+
     const messages = await prisma.message.findMany({
-      where: { chatId: chat.id },
-      orderBy: { createdAt: "asc" },
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            senderId: true,
+          },
+        },
+      },
     });
 
-    return NextResponse.json({ chat, messages });
+    const messageIds = messages.map((msg) => msg.id);
+
+    const seenEntries = await prisma.seen.findMany({
+  where: {
+    seenBy: otherUserId,
+    id: { in: messageIds },
+  },
+  select: { id: true },
+});
+
+const seenMap = new Set(seenEntries.map((entry) => entry.id));
+
+// Append `seen: true/false` to each message directly
+const enrichedMessages = messages.map((msg) => ({
+  ...msg,
+  seen: seenMap.has(msg.id),
+}));
+
+return NextResponse.json({
+  chat,
+  messages: enrichedMessages.reverse(), // oldest first
+});
   } catch (error) {
     console.error("GET /api/messages error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -80,70 +139,80 @@ export async function GET(req, { params }) {
 }
 
 
+
+
 export async function POST(req, { params }) {
   try {
     const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const { followerId: otherUserId } = await params;
+    const { followerId: otherUserId } = params;
     const body = await req.json();
-    const { id, content, type } = body;
+    const { id, content, type ,chatId, replyToId, replyTo} = body;
 
-    // content = body?.content?.trim();
-
-    if (!content) {
+    if (!content?.trim()) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
+    if(!chatId) {const chat = await createOrGetChat(userId, otherUserId)};
+    
+   
+    const sentAt = Date.now(); // milliseconds
+    const createdAt= new Date().toISOString()
 
-    const chat = await createOrGetChat(userId, otherUserId);
-    if (!chat) {
-      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
-    }
-
-    const optimisticMessage = {
-      id, // Use the provided ID for optimistic updates
-      chatId: chat.id,
+    // 1. Store in Redis
+    await redisSet(`message:${id}`, {
+      id,
+      chatId: chatId,
       senderId: userId,
       content,
-      createdAt: new Date().toISOString(),
-      type: body.type || "text",
-    };
-
-    // ✅ Trigger Pusher first
-    const pusher = new Pusher({
-      appId: process.env.PUSHER_APP_ID,
-      key: process.env.NEXT_PUBLIC_PUSHER_KEY,
-      secret: process.env.PUSHER_SECRET,
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-      useTLS: true,
+      status: "sent",
+      createdAt,
+      replyToId: replyToId || null,
     });
 
-    pusher.trigger(`private-chat-${chat?.id}`, "new-message", {
-      message: optimisticMessage,
-    });
-    console.log("triggered pusher for new message:", optimisticMessage);
 
-    // ✅ Save to Prisma and Supabase in the background (not awaited)
-    prisma.message
-      .create({
-        data: {
-          id, //for seen status change we manually provide the ID
-          chatId: chat.id,
-          senderId: userId,
-          content,
+    // 2. Trigger pusher immediately
+    pusher.trigger(`private-chat-${chatId}`, "new-message", {
+      id,
+      chatId: chatId,
+      senderId: userId,
+      content,
+      status: "sent",
+      createdAt,
+      sentAt, // add this
+      replyToId: replyToId ,
+      replyTo: replyTo ,
+    });
+
+    // 3. THEN add to queue (this is backend-only, not user-facing)
+    await messageQueue.add("persist-message", {
+      id,
+      chatId: chatId,
+      senderId: userId,
+      content,
+      replyToId: replyToId || null,
+    },
+      {
+        attempts: 3, // Retry up to 5 times
+        backoff: {
+          type: "exponential",
+          delay: 2000, // Start with 1 second delay
         },
-      })
-      // .then(async (message) => {
-      //   const supabase = getSupabaseClient();
-      //   const { error } = await supabase.from("messages").insert([message]);
-      //   if (error) console.error("Supabase insert error:", error);
-      // })
-      .catch((err) => console.error("DB write failed:", err));
+      }
+  );
 
-    // Respond immediately
-    return NextResponse.json(optimisticMessage);
-  } catch (error) {
+  return NextResponse.json({
+    id,
+    senderId: userId,
+    content,
+    chatId: chatId,
+    status: "sent",
+    replyToId: replyToId || null,
+  });
+}
+catch (error) {
     console.error("POST /api/messages error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
-}
+  }}

@@ -17,7 +17,7 @@ const CommentsSection = ({comments , postId , queryId}) => {
             {
                 comments?.length>0 && (
                     <Flex
-                    style={{borderBottom:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",}}
+                    // style={{borderBottom:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",}}
                     vertical
                     gap="0.5rem"
                     className={css.commentsContainer}

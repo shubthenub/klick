@@ -22,6 +22,11 @@ export const SettingsContextProvider = ({ children }) => {
       [chatId]: message,
     }));
   };
+  const [seenItems, setSeenItems] = useState(new Set());
+
+  const markSeen = async (id) => {
+    setSeenItems((prev) => new Set(prev).add(id));
+  };
 
   const contextValue = {
     settings,
@@ -30,10 +35,12 @@ export const SettingsContextProvider = ({ children }) => {
     setPusherClient,
     onlineUsers,
     setOnlineUsers,
-
     lastMessages,
     setLastMessages,
     updateLastMessage,  // expose helper as well
+    seenItems,
+    setSeenItems,
+    markSeen, // expose markSeen function
   };
 
   return (

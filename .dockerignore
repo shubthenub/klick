@@ -1,0 +1,15 @@
+node_modules
+.git
+.vscode
+*.log
+.next
+Dockerfile
+docker-compose.yml
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+coverage
+README.md
+*.sqlite
+prisma/dev.db
+*.zip

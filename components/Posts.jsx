@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getFeed, getMyPosts } from "../actions/post";
 import { Flex, Spin, Typography } from "antd";
+import { LoadingOutlined } from '@ant-design/icons';
 import { useInView } from "react-intersection-observer";
 import Post from "./Post";
 import { useUser } from "@clerk/nextjs";
@@ -41,8 +42,7 @@ const Posts = ({id="all"}) => {//id==all for feed , id=userId for profile page
   if (isLoading) {
     return (
       <Flex vertical align="center" gap="large" justify="center">
-        <Spin />
-        <Typography>Loading...</Typography>
+        <Spin indicator={<LoadingOutlined spin />} size="large" />
       </Flex>
     );
   }

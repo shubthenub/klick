@@ -3,6 +3,7 @@ import React from "react";
 import css from "@/styles/postGenerator.module.css";
 import Box from "./Box/Box";
 import { Avatar, Button, Flex, Input, message, notification, Spin, Typography } from "antd";
+import { LoadingOutlined } from "@ant-design/icons";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import { useSettings } from "@/context/settings/settings-context";
@@ -88,7 +89,7 @@ const PostGenerator = () => {
   return (
     <>
     {isPending && 
-     <div className={css.spinnerWrapper}>  <Spin />
+     <div className={css.spinnerWrapper}>  <Spin indicator={<LoadingOutlined spin />} size="small" />
     <Typography>
       Posting...
     </Typography></div>

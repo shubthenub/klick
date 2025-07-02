@@ -11,7 +11,7 @@ export default function silentRefresh(callback) {
 
         timeout = window.setTimeout(() => {
           callback(); // Trigger your silent reload logic
-        }, 500); // You can adjust this delay
+        }, 5000); // You can adjust this delay
       }
     };
 

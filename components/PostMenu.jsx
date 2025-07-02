@@ -5,6 +5,7 @@ import { MdDelete } from "react-icons/md";
 import { useDeletePost } from '@/hooks/useDeletePost';
 import { useUser } from '@clerk/nextjs';
 import { Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { FaLink } from "react-icons/fa6";
 
 const PostMenu = ({ postId }) => {
@@ -57,7 +58,7 @@ const PostMenu = ({ postId }) => {
         >
           {item.icon}
           <span>{item.text}</span>
-          {isPending && clickedIndex === index && <Spin size="small" style={{ marginLeft: 8 }} />}
+          {isPending && clickedIndex === index && <Spin indicator={<LoadingOutlined spin />} size="large" />}
         </div>
       ))}
     </div>

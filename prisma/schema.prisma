@@ -101,15 +101,21 @@ model Message {
   content    String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  replyTo   Message? @relation("ReplyTo", fields: [replyToId], references: [id])
+  replyToId String?  
+
+  repliedBy Message[] @relation("ReplyTo") 
 }
 
 model Seen {
-  id       String   @id         // This will store the ID of the resource (post/message/notification)
-  type     SeenType             // Enum: "POST", "MESSAGE", "NOTIFICATION"
-  seenBy   String               // User ID
+  seenId   String   @id @default(cuid())  // ✅ Unique ID for each record
+  id       String                          // Message/Post/Notification ID
+  type     SeenType
+  seenBy   String
   seenAt   DateTime @default(now())
 
-  @@unique([id, type, seenBy]) // Prevent duplicates
+  @@unique([id, type, seenBy], name: "id_type_seenBy")// ✅ Enforce uniqueness manually
+         
 }
 
 enum SeenType {

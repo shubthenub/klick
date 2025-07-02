@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useContext } from "react";
+import { useEffect, useState, useRef, useContext, use } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@clerk/nextjs";
@@ -16,41 +16,66 @@ import silentRefresh from "@/utils/silentRefresh";
 import MediaUploadButton from "@/components/MediaUploadButton";
 import EmojiPicker from "emoji-picker-react";
 import { v4 as uuidv4 } from "uuid"; // or use cuid()
+import SeenWrapper from "@/components/SeenWrapper";
+import { IoCheckmarkSharp } from "react-icons/io5";
+import { FaCheck } from "react-icons/fa";
+import {
+  PiArrowBendDownRightBold,
+  PiArrowBendUpLeftBold,
+} from "react-icons/pi";
 
 export default function ChatPage() {
   const { followerId } = useParams();
   const [messages, setMessages] = useState([]);
+  const [oldestId, setOldestId] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [chatId, setChatId] = useState(null);
   const [text, setText] = useState("");
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+
   const { getToken, userId } = useAuth();
   const [receiver, setReceiver] = useState({});
   const [pendingMedia, setPendingMedia] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiOpenRef = useRef(null);
   const [mediaPreviews, setMediaPreviews] = useState([]); // array of { loading: true } or { url, type }
+  const [seenMessages, setSeenMessages] = useState(
+    (seenItems) => new Set(seenItems || [])
+  );
+  const [hovered, setHovered] = useState(false);
 
+  const [replyToId, setReplyToId] = useState(null); // replyTo is the full message object being replied to
+
+  // const handleSeen = (id) => {
+  //   setSeenMessages((prev) => new Set(prev).add(id));
+  // };
+  const findMessageById = (id) => {
+    return messages.find((msg) => msg.id === id);
+  }
 
   // useState for emoji picker hiding when outside click
   useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (emojiOpenRef.current && !emojiOpenRef.current.contains(event.target)) {
-      setShowEmojiPicker(false);
+    const handleClickOutside = (event) => {
+      if (
+        emojiOpenRef.current &&
+        !emojiOpenRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
     }
-  };
 
-  if (showEmojiPicker) {
-    document.addEventListener("mousedown", handleClickOutside);
-  } else {
-    document.removeEventListener("mousedown", handleClickOutside);
-  }
-
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, [showEmojiPicker]);
-
-
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   const {
     settings,
@@ -59,12 +84,20 @@ export default function ChatPage() {
     setOnlineUsers,
     onlineUsers,
     updateLastMessage,
+    seenItems,
+    markSeen,
+    setSeenItems,
   } = useContext(SettingsContext);
   const isDark = settings.theme === "dark";
 
+  const hasScrolledInitially = useRef(false);
+
   useEffect(() => {
-  messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-}, [messages]);
+    if (!hasScrolledInitially.current && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      hasScrolledInitially.current = true;
+    }
+  }, [messages]);
 
   const getMediaType = (url) => {
     if (/\.(jpeg|jpg|png|gif|webp)$/i.test(url)) return "image";
@@ -72,41 +105,99 @@ export default function ChatPage() {
     return "text";
   };
 
-  const loadMessages = async () => {
-  if (!followerId) return;
+  const topRef = useRef(null);
+  useEffect(() => {
+    console.log(replyToId, "replyToId");
+  }, [replyToId]);
+  const loadMessages = async (isInitial = false) => {
+    if (!followerId || (!isInitial && !hasMore)) return;
 
-  try {
-    const res = await fetch(`/api/messages/${followerId}`, {
-      credentials: "include", // 🔐 Important for sending Clerk cookies
-    });
+    const scrollContainer = scrollContainerRef.current;
+    const prevScrollHeight = scrollContainer?.scrollHeight ?? 0;
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch messages: ${res.status}`);
+    try {
+      const url = new URL(
+        `/api/messages/${followerId}`,
+        window.location.origin
+      );
+      url.searchParams.set("limit", "20");
+      if (!isInitial && oldestId) {
+        url.searchParams.set("before", oldestId);
+      }
+
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text(); // helpful for debugging
+        throw new Error(`Failed to fetch messages. Status: ${res.status}. Response: ${text}`);
+      }
+      const data = await res.json();
+      setChatId(data.chat?.id || null);
+      const parsed = data.messages.map((msg) => {
+        const mediaType = getMediaType(msg.content);
+        return {
+          ...msg,
+          type: mediaType === "text" ? msg.type || "text" : "media",
+          mediaFormat: mediaType !== "text" ? mediaType : undefined,
+          toBeSeen: !msg.seen, // ✅ direct from server
+        };
+      });
+
+      if (isInitial) {
+        setMessages(parsed);
+      } else {
+        setMessages((prev) => [...parsed, ...prev]);
+      }
+
+      if (parsed.length > 0) {
+        setOldestId(parsed[0].id);
+      }
+      if (parsed.length < 20) {
+        setHasMore(false);
+      }
+
+      const apiSeen = new Set(data.seenMessageIds || []);
+      const localSeen = new Set(seenItems);
+      const combinedSeen = new Set([...apiSeen, ...localSeen]);
+
+      setSeenMessages(combinedSeen);
+      setSeenItems(combinedSeen);
+
+      updateLastMessage(
+        data.chat?.id,
+        data.messages?.[data.messages.length - 1]
+      );
+
+      // ⬇ scroll management
+      requestAnimationFrame(() => {
+        if (isInitial && !hasScrolledInitially.current) {
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+          hasScrolledInitially.current = true;
+        } else if (!isInitial) {
+          const newScrollHeight = scrollContainer?.scrollHeight ?? 0;
+          const scrollDiff = newScrollHeight - prevScrollHeight;
+          scrollContainer.scrollTop += scrollDiff;
+        }
+      });
+      console.log("loaded messages:",parsed)
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+    } finally {
+      setIsLoadingMore(false);
     }
+  };
 
-    const data = await res.json();
-    setChatId(data.chat?.id || null);
+  useEffect(() => {
+    if (!topRef.current || !hasMore) return;
 
-    const parsedMessages = (data.messages || []).map((msg) => {
-      const mediaType = getMediaType(msg.content);
-      return {
-        ...msg,
-        type: mediaType === "text" ? msg.type || "text" : "media",
-        mediaFormat: mediaType !== "text" ? mediaType : undefined,
-      };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        loadMessages(false);
+      }
     });
 
-    setMessages(parsedMessages);
-
-    updateLastMessage(
-      data.chat?.id,
-      data.messages?.[data.messages.length - 1]
-    );
-  } catch (error) {
-    console.error("Failed to load messages:", error);
-  }
-};
-
+    observer.observe(topRef.current);
+    return () => observer.disconnect();
+  }, [[oldestId, hasMore, messages.length]]);
 
   const getReceiver = async () => {
     if (!followerId) return;
@@ -115,153 +206,207 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    loadMessages();
+    loadMessages(true);
     getReceiver();
   }, [followerId]);
 
   useEffect(() => {
     if (!chatId || !pusherClient) return;
+
     const channelName = `private-chat-${chatId}`;
     const channel = pusherClient.subscribe(channelName);
-    console.log("subscribed to channel:", channelName);
-    channel.bind("pusher:subscription_error", (err) => {
-        console.error("Subscription error:", err);
-      });
+    console.log("🔔 Subscribed to:", channelName);
 
-
-    channel.bind("new-message", (data) => {
-      let incomingMessage = data.message;
-      const mediaType = getMediaType(incomingMessage.content);
-      if (!incomingMessage.type || incomingMessage.type === "text") {
-        incomingMessage = {
-          ...incomingMessage,
-          type: mediaType !== "text" ? "media" : "text",
-          mediaFormat: mediaType !== "text" ? mediaType : undefined,
-        };
+    const handleNewMessage = (incomingMessageRaw) => {
+      const receivedAt = Date.now();
+      if (incomingMessageRaw.sentAt) {
+        const latency = receivedAt - incomingMessageRaw.sentAt;
+        console.log(`📡 Pusher latency: ${latency} ms`);
       }
+      const mediaType = getMediaType(incomingMessageRaw.content);
 
-      setMessages((prev) => {
-        const index = prev.findIndex(
+      const incomingMessage = {
+        ...incomingMessageRaw,
+        type:
+          incomingMessageRaw.type || (mediaType !== "text" ? "media" : "text"),
+        mediaFormat: mediaType !== "text" ? mediaType : undefined,
+        status: "sent",
+        createdAt: incomingMessageRaw.createdAt || new Date().toISOString(),
+      };
+
+      setMessages((prevMessages) => {
+        const existingIndex = prevMessages.findIndex(
           (m) => m.id === incomingMessage.id
-        );//fix vercel not working on pending messages
+        );
+        const updated = [...prevMessages];
 
-        let updated = [...prev];
-        if (index !== -1) {
-          updated[index] = {
+        if (existingIndex !== -1) {
+          updated[existingIndex] = {
+            ...updated[existingIndex],
             ...incomingMessage,
-            status: "sent", // mark it sent
           };
         } else {
-          updated.push({ ...incomingMessage, status: "sent" });
+          updated.push(incomingMessage);
         }
 
-
-        if (updated.length <= 10)
-          return updated.sort(
-            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-          );
-
-        const splitIndex = updated.length - 10;
-        const first = updated.slice(0, splitIndex);
+        // If more than 10 messages, only keep latest 10 at the end
         const lastTen = updated
-          .slice(splitIndex)
+          .slice(-10)
           .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-        return [...first, ...lastTen];
+        return [...updated.slice(0, updated.length - 10), ...lastTen];
       });
-    });
+    };
 
+    const handleMessageSeen = ({ messageId, seenBy }) => {
+      if (seenBy !== userId) {
+        setSeenMessages((prev) => new Set(prev).add(messageId));
+        setSeenItems((prev) => new Set(prev).add(messageId));
+      }
+    };
+
+    channel.bind("new-message", handleNewMessage);
+    channel.bind("message-seen", handleMessageSeen);
     channel.bind("pusher:subscription_error", async () => {
+      console.warn("🔁 Reinitializing Pusher due to subscription error");
       await initializePusher({ setPusherClient, setOnlineUsers });
     });
 
     return () => {
-      channel.unbind("new-message");
+      channel.unbind("new-message", handleNewMessage);
+      channel.unbind("message-seen", handleMessageSeen);
       pusherClient.unsubscribe(channelName);
+      console.log("❌ Unsubscribed from:", channelName);
     };
   }, [chatId, pusherClient]);
 
   const sendMessage = async () => {
-  if (!chatId) return;
+    if (!chatId) return;
+    console.log(chatId, "chatId ");
+    console.log("Sending message");
+    hasScrolledInitially.current = false; // Reset scroll state for new messages
+    
 
-  // 2. No longer need to fetch the token!
-  // const token = await getToken({ skipCache: true });
+    //  Cache reply info before clearing
+    const localReplyToId = replyToId;
+    let replyTo = null;
+     if (localReplyToId) {
+      const original = findMessageById(localReplyToId, messages);
+      if (original) {
+        replyTo = {
+          id: original.id,
+          content: original.content,
+          senderId: original.senderId,
+        };
+      }
+    }
+    setReplyToId(null); // Clear reply state immediately
 
-  const trimmedText = text.trim();
-  const hasMedia = pendingMedia.length > 0;
-  const hasText = trimmedText.length > 0;
+    
+    const trimmedText = text.trim();
+    const hasMedia = pendingMedia.length > 0;
+    const hasText = trimmedText.length > 0;
 
-  if (!hasMedia && !hasText) return;
+    if (!hasMedia && !hasText) return;
 
-  const mediaToSend = [...pendingMedia];
-  setPendingMedia([]);
-  setText("");
+    const mediaToSend = [...pendingMedia];
+    setPendingMedia([]);
+    setText("");
 
-  const sendPromises = [];
+    const sendPromises = [];
 
-  // Send media messages
-  if (hasMedia) {
-    for (const media of mediaToSend) {
-      const msgMediaId = uuidv4();
+    // Send media messages
+    if (hasMedia) {
+      for (const media of mediaToSend) {
+        const msgMediaId = uuidv4();
+        // ... (optimistic UI code remains the same)
+        // const tempId = `temp-${Date.now()}-${Math.random()}`;
+        const newMessage = {
+          id: msgMediaId,
+          chatId,
+          senderId: userId,
+          content: media.url,
+          type: "media",
+          status: "pending",
+          createdAt: new Date().toISOString(),
+          replyToId: replyToId ,
+          replyTo: replyTo,
+        };
+        setMessages((prev) => [...prev, newMessage]);
+        sendPromises.push(
+          fetch(`/api/messages/${followerId}`, {
+            method: "POST",
+            // credentials: 'include' is crucial. It tells the browser to send cookies.
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              // 3. Authorization header is removed.
+            },
+            body: JSON.stringify({
+              content: media.url,
+              type: "media",
+              id: msgMediaId,
+              chatId,
+              replyToId: replyToId,
+              replyTo: replyTo,
+            }),
+          })
+        );
+        
+      }
+    }
+
+    // Send text message
+    if (hasText) {
+      const msgId = uuidv4();
       // ... (optimistic UI code remains the same)
-      // const tempId = `temp-${Date.now()}-${Math.random()}`;
+      // const tempId = `temp-${Date.now()}`;
       const newMessage = {
-        id: msgMediaId, chatId, senderId: userId, content: media.url,
-        type: "media", status: "pending", createdAt: new Date().toISOString(),
+        id: msgId,
+        chatId,
+        senderId: userId,
+        content: trimmedText,
+        type: "text",
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        replyToId: replyToId ,
+        replyTo: replyTo,
       };
       setMessages((prev) => [...prev, newMessage]);
 
       sendPromises.push(
         fetch(`/api/messages/${followerId}`, {
           method: "POST",
-          // credentials: 'include' is crucial. It tells the browser to send cookies.
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
             // 3. Authorization header is removed.
           },
-          body: JSON.stringify({ content: media.url, type: "media" , id: msgMediaId }),
+          body: JSON.stringify({
+            content: trimmedText,
+            type: "text",
+            id: msgId,
+            chatId,
+            replyToId: replyToId,
+            replyTo: replyTo,
+          }),
         })
       );
     }
-  }
 
-  // Send text message
-  if (hasText) {
-    const msgId = uuidv4();
-    // ... (optimistic UI code remains the same)
-    // const tempId = `temp-${Date.now()}`;
-    const newMessage = {
-      id: msgId, chatId, senderId: userId, content: trimmedText,
-      type: "text", status: "pending", createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, newMessage]);
-
-    sendPromises.push(
-      fetch(`/api/messages/${followerId}`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-           // 3. Authorization header is removed.
-        },
-        body: JSON.stringify({ content: trimmedText, type: "text", id: msgId }),
-      })
-    );
-  }
-
-  try {
-    await Promise.all(sendPromises);
-  } catch (err) {
-    console.error("One or more messages failed to send:", err);
-  }
-};
-
-
-
+    try {
+      await Promise.all(sendPromises);
+    } catch (err) {
+      console.error("One or more messages failed to send:", err);
+    } finally {
+      // Scroll to the bottom after sending messages
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      hasScrolledInitially.current = true;
+    }
+  };
 
   silentRefresh(() => {
-    loadMessages();
+    loadMessages(false);
   });
 
   if (!pusherClient || !userId) {
@@ -324,67 +469,177 @@ export default function ChatPage() {
         </Flex>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "1rem" }}>
-        {messages.map((msg) => {
+      <div
+        ref={scrollContainerRef}
+        style={{ flex: 1, overflowY: "auto", padding: "1rem" }}
+      >
+        {messages.map((msg, i) => {
           const isFromCurrentUser = msg.senderId === userId;
+          const nextMessage = messages[i + 1];
+          const isLastMessageFromFollower =
+            !isFromCurrentUser &&
+            (!nextMessage || nextMessage.senderId === userId);
           const mediaType = msg.mediaFormat || getMediaType(msg.content);
 
           return (
-            <div
+            <SeenWrapper
               key={msg.id}
-              style={{
-                marginBottom: "0.5rem",
-                display: "flex",
-                gap: "0.5rem",
-                flexDirection: isFromCurrentUser ? "row-reverse" : "row",
-                alignItems: "center",
-                opacity: msg.status === "pending" ? 0.6 : 1,
-                transform:
-                  msg.status === "pending" ? "translateX(-5px)" : "none",
-              }}
+              id={msg.id}
+              type="MESSAGE"
+              isFromCurrentUser={isFromCurrentUser}
+              chatId={chatId}
+              seenMessages={seenMessages}
+              status={msg.status}
+              disabled={true}
             >
-              {!isFromCurrentUser && (
-                <Avatar src={receiver?.data?.image_url} size={30} />
-              )}
               <div
+                ref={i == 0 ? topRef : null}
                 style={{
-                  maxWidth: "50%",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "1.5rem",
-                  backgroundColor: isDark ? "#1a1a1a" : "#f2f2f2",
-                  fontSize: "0.95rem",
-                  wordBreak: "break-word",
-                  whiteSpace: "pre-wrap",
-                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-                  color: isDark ? "#f2f2f2" : "#1a1a1a",
+                  marginBottom: "0.5rem",
+                  display: "flex",
+                  gap: "0.5rem",
+                  flexDirection: isFromCurrentUser ? "row-reverse" : "row",
+                  alignItems: "center",
+                  opacity: msg.status === "pending" ? 0.6 : 1,
+                  transform:
+                    msg.status === "pending" ? "translateX(-5px)" : "none",
                 }}
               >
-                {mediaType === "image" ? (
-                  <Image
-                    src={msg.content}
-                    alt="Media"
+                {!isFromCurrentUser &&
+                  (isLastMessageFromFollower ? (
+                    <Avatar src={receiver?.data?.image_url} size={30} />
+                  ) : (
+                    <div style={{ width: "30px", height: "1px" }} /> // Placeholder to align message
+                  ))}
+
+                <div
+                  className="message-container"
+                  onMouseEnter={() => setHovered(true)}
+                  onMouseLeave={() => setHovered(false)}
+                  style={{
+                    position: "relative",
+                    maxWidth: "50%",
+                    display: "flex",
+                    flexDirection: isFromCurrentUser ? "row-reverse" : "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
                     style={{
-                      maxWidth: "100%",
-                      borderRadius: "12px",
-                      maxHeight: "200px",
+                      padding: "0.75rem 1rem",
+                      borderRadius: "1.5rem",
+                      backgroundColor: isDark ? "#1a1a1a" : "#f2f2f2",
+                      fontSize: "0.95rem",
+                      wordBreak: "break-word",
+                      whiteSpace: "pre-wrap",
+                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+                      color: isDark ? "#f2f2f2" : "#1a1a1a",
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      // alignItems: "center",
+                      gap: "0.5rem",
+                      justifyContent: "space-between",
                     }}
-                  />
-                ) : mediaType === "video" ? (
-                  <video
-                    src={msg.content}
-                    controls
-                    autoPlay={false}
+                  >
+                    {msg.replyTo && (
+                      <div
+                        style={{
+                          marginBottom: "0.5rem",
+                          padding: "0.5rem",
+                          backgroundColor: isDark ? "#2a2a2a" : "#e9e9e9",
+                          borderRadius: "8px",
+                          fontSize: "0.85rem",
+                          color: isDark ? "#ccc" : "#333",
+                        }}
+                      >
+                        <span>{msg.replyTo.senderId === userId ? "You" : "Them"}:</span>
+                        <p>{msg.replyTo.content?.slice(0, 100) || "This message was deleted"}</p>
+                      </div>
+                    )}
+
+                    {/* Content */}
+                    {mediaType === "image" ? (
+                      <Image
+                        src={msg.content}
+                        alt="Media"
+                        style={{
+                          maxWidth: "100%",
+                          borderRadius: "12px",
+                          maxHeight: "200px",
+                        }}
+                      />
+                    ) : mediaType === "video" ? (
+                      <video
+                        src={msg.content}
+                        controls
+                        style={{
+                          maxWidth: "100%",
+                          borderRadius: "12px",
+                          maxHeight: "200px",
+                        }}
+                      />
+                    ) : (
+                      msg.content
+                    )}
+
+                    {/* Always visible tick icon (right-aligned) */}
+                    {seenMessages.has(msg.id) && isFromCurrentUser && (
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "rgb(240, 212, 157)",
+                          position: "absolute",
+                          right: "-9px",
+                          bottom: "0px",
+                          fontWeight: "900",
+                        }}
+                      >
+                        <IoCheckmarkSharp />
+                      </div>
+                    )}
+                  </div>
+
+                  <div
                     style={{
-                      maxWidth: "100%",
-                      borderRadius: "12px",
-                      maxHeight: "200px",
+                      fontSize: "0.85rem",
+                      color: "#888",
+                      cursor: "pointer",
                     }}
-                  />
-                ) : (
-                  msg.content
-                )}
+                    onClick={() => setReplyToId(msg.id)}
+                  >
+                    {isFromCurrentUser ? (
+                      <PiArrowBendUpLeftBold />
+                    ) : (
+                      <PiArrowBendDownRightBold />
+                    )}
+                  </div>
+
+                  {/* Hover-only "seen at" text (left-aligned outside bubble) */}
+                  {seenMessages.has(msg.id) && isFromCurrentUser && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "-100px",
+                        top: "55%",
+                        transform: "translateY(-50%)",
+                        fontSize: "0.75rem",
+                        color: "#999",
+                        opacity: hovered ? 1 : 0,
+                        transition: "opacity 0.2s ease-in-out",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      seen at{" "}
+                      {new Date(msg.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </SeenWrapper>
           );
         })}
         <div ref={messagesEndRef} />
@@ -470,8 +725,15 @@ export default function ChatPage() {
             ))}
           </div>
         )}
+        {/* reply preview */}
+        {replyToId && (
+          <div style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" , justifyContent: "space-between"}}>
+            <span>Replying to: {findMessageById(replyToId)?.content.slice(0, 30)}</span>
+            <button onClick={() => setReplyToId(null)}>✖</button>
+          </div>
+        )}
 
-      {/* input options  */}
+        {/* input options  */}
         <Flex align="center" gap="1rem" style={{ width: "100%" }}>
           <MediaUploadButton
             onUpload={(urls) => {
@@ -484,8 +746,7 @@ export default function ChatPage() {
           />
 
           {/* === Emoji Picker Button === */}
-          <div style={{ position: "relative" }} 
-            ref={emojiOpenRef}>
+          <div style={{ position: "relative" }} ref={emojiOpenRef}>
             <Button
               icon={<Icon icon="twemoji:smiling-face-with-smiling-eyes" />}
               onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -521,6 +782,7 @@ export default function ChatPage() {
               if (!e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+                console.log("Sending message:", text);
               }
             }}
             style={{ resize: "none", flex: 1 }}

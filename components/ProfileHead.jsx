@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { useMutation } from "@tanstack/react-query";
 import { updateBanner } from "@/actions/user";
 import Box from "./Box/Box";
+import { LoadingOutlined } from '@ant-design/icons';
 const { Text } = Typography;
 const TABS=[
     {
@@ -66,7 +67,7 @@ const ProfileHead = ({ userId, data, isLoading, isError , selectedTab , setSelec
 
   return (
     <div className={css.container}>
-      <Spin
+      <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
         spinning={isPending}
         style={{
           position: "absolute",

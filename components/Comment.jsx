@@ -13,7 +13,7 @@ const Comment = ({ data }) => {
   } = useContext(SettingsContext);
   return (
     <Flex gap={"0.5rem"} align="center" 
-    style={{  borderTop:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",   }}
+    // style={{  borderTop:"1px solid hsla(0, 1.90%, 42.00%, 0.48)",   }}
     >
       {/* avatar of user */}
       <Avatar size={30} src={data?.author?.image_url} />

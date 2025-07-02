@@ -54,3 +54,8 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(152, 152, 152, 0.804);
 }
+.cl-signIn-root, .cl-card, .cl-cardBox {
+  width: 350px !important; /* Force width */
+  max-width: 100% !important; /* Prevent overflow */
+  max-height: 80vh !important; /* Prevent overflow */
+}

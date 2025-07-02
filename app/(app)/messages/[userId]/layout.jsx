@@ -164,9 +164,9 @@ const Layout = ({ children }) => {
                           backgroundColor: "#00ff00",
                           position: "absolute",
                           bottom: "5%",
-                          right: "0",
-                          height: "5px",
-                          width: "5px",
+                          right: "1px",
+                          height: "7px",
+                          width: "7px",
                           borderRadius: "50%",
                         }}
                       ></span>

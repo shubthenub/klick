@@ -1,0 +1,10 @@
+services:
+  message-worker:
+    build: .
+    container_name: message-worker
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}

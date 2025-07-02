@@ -242,8 +242,8 @@ export default function ChatPage() {
 
         if (existingIndex !== -1) {
           updated[existingIndex] = {
-            ...updated[existingIndex],
-            ...incomingMessage,
+            ...incomingMessage, // real message from Pusher takes priority
+            // Preserve any local-only fields if needed
           };
         } else {
           updated.push(incomingMessage);

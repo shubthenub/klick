@@ -11,6 +11,7 @@ import { ToastProvider } from "@/lib/ThemeProvider/ToastProvider"; // Import the
 import { HydrationBoundary, QueryClient, QueryClientProvider, dehydrate } from "@tanstack/react-query";
 import { App } from "antd";
 import PusherInitializer from "@/components/PusherInitializer";
+import PostModal from "@/components/postModal";
 
 const queryClient = new QueryClient(); // Ensure QueryClient is created on the client side
 
@@ -35,7 +36,10 @@ const HomeLayout = ({ children }) => {
 
                   <div className={css.container}>
                     <Sidebar />
-                    <div className={css.page_body}>{children}</div>
+                    <div className={css.page_body}>
+                      {children}
+                      <PostModal/>
+                      </div>
                   </div>
                 </div>
               </Box>

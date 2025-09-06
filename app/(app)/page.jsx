@@ -1,7 +1,7 @@
 "use client";
 import { useSettings } from "@/context/settings/settings-context";
 import React from "react";
-import { useUser, UserButton , RedirectToSignIn } from "@clerk/nextjs";
+import { useUser, UserButton , RedirectToSignIn, useClerk } from "@clerk/nextjs";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@clerk/nextjs";
@@ -10,7 +10,7 @@ import HomeView from "@/sections/HomeView";
 const page = () => {
   const { isSignedIn } = useUser(); // Check if the user is signed in
   const router = useRouter(); // Next.js Router for manual redirection
-
+  const { signOut } = useClerk(); // Clerk signOut
   // Ensure the redirect happens only on the client side, after the component has mounted
   useEffect(() => {
     if (isSignedIn===false) {  //dont remove this useeffect

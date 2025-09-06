@@ -12,7 +12,7 @@ const CommentButton = ({comments}) => {
                 color='grey'
             />
             <Typography.Text>
-                {comments>0 ? comments : "Comment"}
+                {comments>0 ? comments : ""}
             </Typography.Text>
         </Flex>
     </Button>

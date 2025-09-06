@@ -1,0 +1,149 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.postPreview {
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: #f9f9f9;
+}
+
+.darkModal .postPreview {
+  border-color: #333;
+  background-color: #1a1a1a;
+}
+
+.postContent {
+  margin-top: 0.5rem;
+}
+
+.postHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.authorName {
+  font-weight: 500;
+}
+
+.postText {
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.postMedia {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.messageInput {
+  margin-bottom: 1rem;
+}
+
+.userSelection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.searchHeader {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+}
+
+.selectAllBtn {
+  white-space: nowrap;
+}
+
+.userList {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e1e1e1;
+  border-radius: 6px;
+}
+
+.darkModal .userList {
+  border-color: #333;
+}
+
+.userItem {
+  padding: 0.5rem 1rem !important;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.darkModal .userItem {
+  border-bottom-color: #333;
+}
+
+.userItem:last-child {
+  border-bottom: none;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.userDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.userName {
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.userUsername {
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.2;
+}
+
+.loading, .noUsers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.darkModal .loading, .darkModal .noUsers {
+  color: #999;
+}
+
+/* Dark theme overrides */
+.darkModal {
+  color: #fff;
+}
+
+.darkModal .ant-modal-content {
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
+.darkModal .ant-modal-header {
+  background-color: #1a1a1a;
+  border-bottom-color: #333;
+}
+
+.darkModal .ant-modal-title {
+  color: #fff;
+}
+
+.darkModal .ant-modal-footer {
+  border-top-color: #333;
+  background-color: #1a1a1a;
+}

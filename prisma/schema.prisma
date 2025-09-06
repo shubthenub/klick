@@ -9,113 +9,195 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  first_name    String?
-  last_name     String?
-  image_url     String?
-  banner_id     String?
-  banner_url    String?
-  username      String?   @unique
-  email_address String?   @unique
-  posts         Post[]
-  Like          Like[]
-  Comment       Comment[]
-  Followers     Follow[] @relation("Following")
-  Following     Follow[] @relation("Follower")
-
-  chatParticipants ChatParticipant[]
-  sentMessages     Message[] @relation("MessageSender")
+  id                    String            @id
+  first_name            String?
+  last_name             String?
+  image_url             String?
+  banner_url            String?
+  username              String?           @unique
+  email_address         String?           @unique
+  banner_id             String?
+  chatParticipants      ChatParticipant[]
+  Comment               Comment[]
+  Following             Follow[]          @relation("Follower")
+  Followers             Follow[]          @relation("Following")
+  Like                  Like[]
+  sentMessages          Message[]         @relation("MessageSender")
+  notifications_sent    Notification[]    @relation("Sender")
+  Notification_received Notification[]    @relation("Receiver")
+  posts                 Post[]
 }
 
 model Post {
-  id        Int       @id @default(autoincrement())
-  postText  String?
-  media     String?
-  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId  String
-  cld_id    String?
-  createdAt DateTime  @default(now())
-  likes     Like[]
-  comments  Comment[]
-  trends    Trend[] //these three being array represent one to many relationship
+  id             Int            @id @default(autoincrement())
+  postText       String?
+  authorId       String
+  cld_id         String?
+  createdAt      DateTime       @default(now())
+  media          Json?
+  comments       Comment[]
+  likes          Like[]
+  sharedMessages Message[]
+  notifications  Notification[]
+  author         User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  trends         Trend[]
+
+  @@index([authorId])
+  @@index([createdAt])
+
 }
 
 model Like {
   id        Int      @id @default(autoincrement())
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId    Int
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId    Int?
   authorId  String
   createdAt DateTime @default(now())
+  commentId Int?
+  messageId String?
+  type      LikeType @default(POST)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([authorId, postId, commentId, messageId, type])
+  @@index([postId])
+  @@index([commentId])
+  @@index([messageId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model Comment {
-  id        Int      @id @default(autoincrement())
-  comment   String?
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId    Int
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId  String
-  createdAt DateTime @default(now())
+  id           Int            @id @default(autoincrement())
+  comment      String?
+  postId       Int
+  authorId     String
+  createdAt    DateTime       @default(now())
+  parentId     Int?
+  author       User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent       Comment?       @relation("ReplyThread", fields: [parentId], references: [id])
+  replies      Comment[]      @relation("ReplyThread")
+  post         Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  Like         Like[]
+  Notification Notification[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
 }
 
 model Trend {
   id     Int     @id @default(autoincrement())
   name   String?
-  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId Int
+  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model Follow {
   id          Int      @id @default(autoincrement())
-  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
   followerId  String
-  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
   followingId String
   createdAt   DateTime @default(now())
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  @@index([followerId])
+  @@index([followingId])
+  @@index([createdAt])
 }
 
-
 model Chat {
-  id           String             @id @default(cuid())
+  id           String            @id @default(cuid())
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   participants ChatParticipant[]
   messages     Message[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
 }
 
 model ChatParticipant {
-  id      String   @id @default(cuid())
-  user    User     @relation(fields: [userId], references: [id])
-  userId  String
-  chat    Chat     @relation(fields: [chatId], references: [id])
-  chatId  String
+  id     String @id @default(cuid())
+  userId String
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
-  id         String   @id 
-  chat       Chat     @relation(fields: [chatId], references: [id])
-  chatId     String
-  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
-  senderId   String
-  content    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  replyTo   Message? @relation("ReplyTo", fields: [replyToId], references: [id])
-  replyToId String?  
+  id           String      @id
+  chatId       String
+  senderId     String
+  content      String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  replyToId    String?
+  type         MessageType @default(TEXT)
+  sharedPostId Int?
+  Like         Like[]
+  chat         Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  replyTo      Message?    @relation("ReplyTo", fields: [replyToId], references: [id])
+  repliedBy    Message[]   @relation("ReplyTo")
+  sender       User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sharedPost   Post?       @relation(fields: [sharedPostId], references: [id])
 
-  repliedBy Message[] @relation("ReplyTo") 
+  @@index([chatId])
+  @@index([senderId])
+  @@index([replyToId])
+  @@index([sharedPostId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model Notification {
+  id         Int              @id @default(autoincrement())
+  message    String
+  type       NotificationType
+  fromUserId String
+  toUserId   String
+  postId     Int?
+  createdAt  DateTime         @default(now())
+  isRead     Boolean          @default(false)
+  commentId  Int?
+  comment    Comment?         @relation(fields: [commentId], references: [id])
+  fromUser   User             @relation("Sender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  toUser     User             @relation("Receiver", fields: [toUserId], references: [id], onDelete: Cascade)
+
+
+  @@index([toUserId])
+  @@index([fromUserId])
+  @@index([postId])
+  @@index([commentId])
+  @@index([isRead])
+  @@index([createdAt])
 }
 
 model Seen {
-  seenId   String   @id @default(cuid())  // ✅ Unique ID for each record
-  id       String                          // Message/Post/Notification ID
-  type     SeenType
-  seenBy   String
-  seenAt   DateTime @default(now())
+  id     String
+  type   SeenType
+  seenBy String
+  seenAt DateTime @default(now())
+  seenId String   @id @default(cuid())
 
-  @@unique([id, type, seenBy], name: "id_type_seenBy")// ✅ Enforce uniqueness manually
-         
+  @@unique([id, type, seenBy], name: "id_type_seenBy")
+}
+
+enum LikeType {
+  POST
+  COMMENT
+  MESSAGE
+}
+
+enum MessageType {
+  TEXT
+  MEDIA
+  SHARED_POST
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  POST
 }
 
 enum SeenType {
@@ -123,5 +205,3 @@ enum SeenType {
   MESSAGE
   NOTIFICATION
 }
-
-

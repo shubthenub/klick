@@ -3,13 +3,13 @@ import {useQuery} from '@tanstack/react-query'
 import { Alert, Skeleton, Space, Typography } from 'antd'
 import Box from './Box/Box'
 import css from '@/styles/followInfoBox.module.css'
-import { getAllFollowersAndFollowingInfo } from '@/actions/user'
+import { getAllFollowersAndFollowingInfo , getFollowersAndFollowingIds } from '@/actions/user'
 
 
 const FollowInfoBox = ({id}) => {
     const {data , isLoading , isError} = useQuery({
         queryKey : ['user' , id, 'followInfo'],
-        queryFn : ()=> getAllFollowersAndFollowingInfo(id),
+        queryFn : ()=> getFollowersAndFollowingIds(id),
         enabled : !!id,
         staleTime : 1000 * 60 * 20,
     })

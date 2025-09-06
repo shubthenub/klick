@@ -2,6 +2,9 @@
 import {db} from "@/lib/db";
 import { deleteFile, uploadFile } from "./uploadFile";
 import { currentUser } from "@clerk/nextjs/server";
+import prisma from "@/lib/prisma";
+import { redisGet, redisSet } from '@/lib/redisSet';
+import { followersCache } from '@/utils/followersCache';
 
 export const createUser = async (user) => {
     const { id, first_name, last_name, email_address, image_url, username } = user;
@@ -144,26 +147,213 @@ export const updateBanner = async (params) => {
     }
 };
 
-export const getAllFollowersAndFollowingInfo = async (id) => {
+// For feed and follow button - IDs only (fast)
+export const getFollowersAndFollowingIds = async (id) => {
     try {
-        const followers = await db.follow.findMany({
-            where: { followingId: id },
-            include:{
-                follower:true,
-            },
-        });
-        const following = await db.follow.findMany({
-            where: { followerId: id },
-            include:{
-                following:true,
-            },
-        });
+        const [followers, following] = await Promise.all([
+            prisma.follow.findMany({
+                where: { followingId: id },
+                select: { followerId: true },
+            }),
+            prisma.follow.findMany({
+                where: { followerId: id },
+                select: { followingId: true },
+            })
+        ]);
 
-        return { followers, following };
+        return { 
+            followers: followers.map(f => ({ followerId: f.followerId })),
+            following: following.map(f => ({ followingId: f.followingId }))
+        };
     } catch (error) {
-        console.error("Error fetching followers and following info:", error);
+        console.error("Error fetching followers and following IDs:", error);
+        throw error;
     }
 };
+
+// For profile pages - full user data (slower but needed)
+// Temporary bypass - comment out the cache check
+
+
+export const getAllFollowersAndFollowingInfo = async (
+  id,
+  { cursor = 0, limit = 15, followers = true, following = true } = {}
+) => {
+  try {
+    const result = {
+      followers: [],
+      following: [],
+      nextCursorFollowers: null,
+      nextCursorFollowing: null,
+    };
+
+    // =========================
+    // ✅ Followers (lazy + cache first page)
+    // =========================
+    if (followers) {
+      if (cursor === 0) {
+        const followersCacheKey = `followers:${id}:first:${limit}`;
+        const cachedFollowers = await redisGet(followersCacheKey);
+
+        if (cachedFollowers) {
+          console.log(`🎯 Cache hit for followers of user ${id} (first page)`);
+          result.followers = cachedFollowers.data;
+          result.nextCursorFollowers = cachedFollowers.nextCursor;
+        } else {
+          console.log(`💾 Cache miss for followers of user ${id} (first page)`);
+          const followersFromDb = await prisma.follow.findMany({
+            where: { followingId: id },
+            take: limit + 1,
+            orderBy: { createdAt: "desc" },
+            include: {
+              follower: {
+                select: {
+                  id: true,
+                  first_name: true,
+                  last_name: true,
+                  username: true,
+                  image_url: true,
+                },
+              },
+            },
+          });
+
+          let nextCursorFollowers = null;
+          if (followersFromDb.length > limit) {
+            nextCursorFollowers = limit;
+            followersFromDb.pop();
+          }
+
+          result.followers = followersFromDb;
+          result.nextCursorFollowers = nextCursorFollowers;
+
+          await redisSet(
+            followersCacheKey,
+            { data: followersFromDb, nextCursor: nextCursorFollowers },
+            600
+          );
+        }
+      } else {
+        const followersFromDb = await prisma.follow.findMany({
+          where: { followingId: id },
+          skip: cursor,
+          take: limit + 1,
+          orderBy: { createdAt: "desc" },
+          include: {
+            follower: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                username: true,
+                image_url: true,
+              },
+            },
+          },
+        });
+
+        let nextCursorFollowers = null;
+        if (followersFromDb.length > limit) {
+          nextCursorFollowers = cursor + limit;
+          followersFromDb.pop();
+        }
+
+        result.followers = followersFromDb;
+        result.nextCursorFollowers = nextCursorFollowers;
+      }
+    }
+
+    // =========================
+    // ✅ Following (lazy + cache first page)
+    // =========================
+    if (following) {
+      if (cursor === 0) {
+        const followingCacheKey = `following:${id}:first:${limit}`;
+        const cachedFollowing = await redisGet(followingCacheKey);
+
+        if (cachedFollowing) {
+          console.log(`🎯 Cache hit for following of user ${id} (first page)`);
+          result.following = cachedFollowing.data;
+          result.nextCursorFollowing = cachedFollowing.nextCursor;
+        } else {
+          console.log(`💾 Cache miss for following of user ${id} (first page)`);
+          const followingFromDb = await prisma.follow.findMany({
+            where: { followerId: id },
+            take: limit + 1,
+            orderBy: { createdAt: "desc" },
+            include: {
+              following: {
+                select: {
+                  id: true,
+                  first_name: true,
+                  last_name: true,
+                  username: true,
+                  image_url: true,
+                },
+              },
+            },
+          });
+
+          let nextCursorFollowing = null;
+          if (followingFromDb.length > limit) {
+            nextCursorFollowing = limit;
+            followingFromDb.pop();
+          }
+
+          result.following = followingFromDb;
+          result.nextCursorFollowing = nextCursorFollowing;
+
+          await redisSet(
+            followingCacheKey,
+            { data: followingFromDb, nextCursor: nextCursorFollowing },
+            600
+          );
+        }
+      } else {
+        const followingFromDb = await prisma.follow.findMany({
+          where: { followerId: id },
+          skip: cursor,
+          take: limit + 1,
+          orderBy: { createdAt: "desc" },
+          include: {
+            following: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                username: true,
+                image_url: true,
+              },
+            },
+          },
+        });
+
+        let nextCursorFollowing = null;
+        if (followingFromDb.length > limit) {
+          nextCursorFollowing = cursor + limit;
+          followingFromDb.pop();
+        }
+
+        result.following = followingFromDb;
+        result.nextCursorFollowing = nextCursorFollowing;
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error("🔥 Error fetching followers/following info:", error);
+    return {
+      followers: [],
+      following: [],
+      nextCursorFollowers: null,
+      nextCursorFollowing: null,
+    };
+  }
+};
+
+
+
+
 
 
 export const getFollowSuggestions = async (userId) => {
@@ -227,6 +417,14 @@ export const getFollowSuggestions = async (userId) => {
             });
             console.log("User unfollowed");
           }
+
+          // ✅ Invalidate caches for both users
+            Promise.all([
+            followersCache.invalidateAndWarmBoth(id),      // Target user's followers/following
+            followersCache.invalidateAndWarmBoth(userId),  // Current user's followers/following
+            ]).catch(err => 
+            console.error('Cache warming failed:', err)
+            );
       
           return { success: true };
         } catch (e) {

@@ -9,7 +9,7 @@ export const useDeletePost = () => {
             return await deletePostFn(postId, userId);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['posts'] }); // Adjust your query key
+            queryClient.invalidateQueries({ queryKey: ['posts','all'] }); // Adjust your query key
         },
     });
 };

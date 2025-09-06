@@ -23,7 +23,7 @@ const Sidebar = () => {
   const { width } = useWindowDimensions();
   useEffect(() => {
   const isHome = pathname === "/";
-  const isMobile = width <= 900;
+  const isMobile = width <= 960;
 
   if (isMobile) {
     setIsMini(false); // Always show full sidebar on mobile
@@ -59,6 +59,10 @@ const Sidebar = () => {
   const isActive = (route) => {
   if (route.route === "/") {
     return pathname === "/" ? css.active : "";
+  }
+  // Special case for /messages tab
+  if (route.route === "/messages/") {
+    return (pathname === "/messages" || pathname.startsWith("/messages/")) ? css.active : "";
   }
   return pathname.startsWith(route.route) ? css.active : "";
 };

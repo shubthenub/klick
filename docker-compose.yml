@@ -1,10 +1,67 @@
+version: "3.9"
+
 services:
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    container_name: redis-stack
+
   message-worker:
-    build: .
-    container_name: message-worker
-    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: social-worker:latest
+    command: ["node", "worker/messageWorker.js"]
     env_file:
-      - .env
-    environment:
-      - REDIS_URL=${REDIS_URL}
-      - DATABASE_URL=${DATABASE_URL}
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always
+
+  post-worker:
+    image: social-worker:latest
+    command: ["node", "worker/postWorker.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always
+
+  comment-worker:
+    image: social-worker:latest
+    command: ["node", "worker/commentWorker.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always
+
+  like-worker:
+    image: social-worker:latest
+    command: ["node", "worker/likeWorker.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always
+
+  background-fetch-worker:
+    image: social-worker:latest
+    command: ["node", "worker/backgroundFetch.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always
+    profiles: [background]
+
+  seen-worker:
+    image: social-worker:latest
+    command: ["node", "worker/seenWorker.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    restart: always

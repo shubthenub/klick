@@ -18,153 +18,118 @@ import toast from "react-hot-toast";
  * @param {Object} props.loggedInUserData - Current logged-in user ki info
  */
 const UserBox = ({ data, type, loggedInUserData }) => {
-  // State variables
-  const [followed, setFollowed] = useState(false); // Follow status track karne ke liye
-  const [isProcessing, setIsProcessing] = useState(false); // Loading state
+  const [followed, setFollowed] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  // Hooks initialization
-  const { user: currentUser } = useUser(); // Current user nikalne ke liye
-  const queryClient = useQueryClient(); // Query client for data management
+  const { user: currentUser } = useUser();
+  const queryClient = useQueryClient();
   
-  // User ID nikal rahe hai
-  const personId = data?.[type]?.id;
+  // ✅ Fix data access to handle both structures
+  const userData = data?.[type] || data; // Handle both nested and direct structures
+  const personId = userData?.id || data?.[type === "follower" ? "followerId" : "followingId"];
 
-  /**
-   * Effect jo follow status check karta hai
-   * Jab bhi loggedInUserData, data ya type change hota hai
-   */
+  // ✅ Add debug logging to see the actual structure
+  console.log("UserBox Debug:", {
+    type,
+    data,
+    userData,
+    personId,
+    dataKeys: data ? Object.keys(data) : null
+  });
+
   useEffect(() => {
-    // Current user ke following IDs nikal rahe hai
     const followingIds = loggedInUserData?.following?.map(person => person?.followingId) || [];
     
-    // Check karte hai ki yeh user followed hai ya nahi
-    const isFollowing = followingIds.includes(
-      data?.[type === "follower" ? "followerId" : "followingId"]
-    );
+    // ✅ Use the correct ID for checking follow status
+    const targetId = userData?.id || data?.[type === "follower" ? "followerId" : "followingId"];
+    const isFollowing = followingIds.includes(targetId);
     
-    // Local state update karte hai
     setFollowed(isFollowing);
-  }, [loggedInUserData, data, type]);
+  }, [loggedInUserData, data, type, userData]);
 
-  /**
-   * Follow/Unfollow ka mutation
-   * Yahan pe OPTIMISTIC UPDATE ka magic hai
-   */
   const { mutate } = useMutation({
-    mutationFn: updateFollow, // API call function
+    mutationFn: updateFollow,
 
-    /**
-     * OPTIMISTIC UPDATE WALA SECTION (Asli API call se pehle)
-     * Yahan pe hum UI ko instantly update karte hai
-     * Follow button -> Followed ho jata hai instantly
-     * Par suggestions list mein user tab tak rahega jab tak refresh nahi karte
-     */
     onMutate: async (params) => {
-      setIsProcessing(true); // Loading shuru
+      setIsProcessing(true);
       
-      // Existing queries cancel karte hai taaki race condition na ho
       await queryClient.cancelQueries(["user", currentUser?.id, "followInfo"]);
       await queryClient.cancelQueries(["user", personId, "followInfo"]);
 
-      /**
-       * YAHAN PE ASLI OPTIMISTIC UPDATE HOTA HAI
-       * Hum cache ko manually update karte hai
-       * Taaki UI instantly respond kare
-       */
       queryClient.setQueryData(
         ["user", currentUser?.id, "followInfo"],
         (old) => {
-          // Naya following array banate hai
           const newFollowing = params?.type === "follow"
             ? [
-                ...(old?.following || []), // Purane follows ke saath
+                ...(old?.following || []),
                 {
-                  followingId: params.id, // Naya follow add karte hai
+                  followingId: params.id,
                   followerId: currentUser?.id,
-                  following: data[type],
+                  following: userData, // ✅ Use userData instead of data[type]
                 },
               ]
             : (old?.following || []).filter(
-                person => person.followingId !== params.id // Unfollow case
+                person => person.followingId !== params.id
               );
 
           return {
             ...old,
-            following: newFollowing, // Updated array return karte hai
+            following: newFollowing,
           };
         }
       );
 
-      // Local state ko bhi update karte hai
       setFollowed(params?.type === "follow");
-
-      // Error handling ke liye previous state save karte hai
       return { previousFollowStatus: followed };
     },
 
-    /**
-     * Agar error aaya toh - optimistic update ko revert karte hai
-     */
     onError: (err, variables, context) => {
       toast.error("Kuch gadbad ho gaya. Phir se try karo!");
       console.error("Follow error:", err);
-      // Wapas previous state pe set karte hai
       setFollowed(context.previousFollowStatus);
     },
 
-    /**
-     * REFRESH/REVALIDATION WALA SECTION
-     * API call complete hone ke baad
-     * Yahan pe hum decide karte hai ki kya refresh karna hai
-     */
     onSettled: () => {
-      setIsProcessing(false); // Loading khatam
+      setIsProcessing(false);
       
-      // Current user ka follow data refresh karte hai (active queries ke liye)
       queryClient.invalidateQueries({
         queryKey: ["user", currentUser?.id, "followInfo"],
-        refetchType: 'active', // Active screens pe immediately refresh
+        refetchType: 'active',
       });
       
-      /**
-       * SPECIAL LOGIC FOR SUGGESTIONS:
-       * Hum suggestions list ko INACTIVELY invalidate karte hai
-       * Matlab yeh tab refresh hoga jab:
-       * - Page refresh karenge
-       * - Dusre route pe jayenge aur wapas aayenge
-       * Isse suggestions list mein user abhi bhi dikhega
-       * Lekin "Followed" state dikhayega
-       */
       queryClient.invalidateQueries({
         queryKey: ["user", "followSuggestions"],
-        refetchType: 'inactive', // Next refresh tak wait karega
+        refetchType: 'inactive',
       });
     },
   });
 
-  // Button disable conditions
-  const isButtonDisabled = isProcessing || data?.[type]?.id === currentUser?.id;
+  // ✅ Fix button disable condition
+  const isButtonDisabled = isProcessing || personId === currentUser?.id;
+
+  // ✅ If no valid user data, don't render
+  if (!userData || !personId) {
+    console.warn("UserBox: No valid user data", { data, type, userData, personId });
+    return null;
+  }
 
   return (
     <Box className={css.container}>
-      {/* Left side - User ki photo aur details */}
       <div className={css.left}>
-        <Avatar src={data?.[type]?.image_url} size={40} />
+        <Avatar src={userData?.image_url} size={40} />
         <div className={css.details}>
           <Typography.Text className={"typoSubtitle2"} ellipsis>
-            {data?.[type]?.first_name} {data?.[type]?.last_name}
+            {userData?.first_name} {userData?.last_name}
           </Typography.Text>
           <Typography.Text className={"typoCaption"} type="secondary">
-            @{data?.[type]?.username}
+            @{userData?.username}
           </Typography.Text>
         </div>
       </div>
 
-      {/* Right side - Follow button (current user ke liye nahi) */}
       {!isButtonDisabled && (
         <div className={css.right}>
           {!followed ? (
-            // Follow button (abhi follow nahi hai)
             <Button
               onClick={() => mutate({ 
                 id: personId, 
@@ -180,7 +145,6 @@ const UserBox = ({ data, type, loggedInUserData }) => {
               <Typography.Text strong>Follow</Typography.Text>
             </Button>
           ) : (
-            // Followed state (green tick wala)
             <Button
               type="text"
               size="small"
@@ -205,5 +169,4 @@ const UserBox = ({ data, type, loggedInUserData }) => {
     </Box>
   );
 };
-
 export default UserBox;

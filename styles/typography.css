@@ -108,7 +108,7 @@
     }
   }
   
-  @media (min-width: 900px) {
+  @media (min-width: 960px) {
     .typoH1 {
       font-size: 3.625rem;
     }

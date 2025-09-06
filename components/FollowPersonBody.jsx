@@ -17,9 +17,38 @@ const FollowPersonBody = ({ id, type }) => {
         isError: userDataError,
     } = useQuery({
         queryKey: ["user", id, "followInfo"],
-        queryFn: () => getAllFollowersAndFollowingInfo(id),
+        queryFn: async () => {
+            console.log("🚀 React Query calling getAllFollowersAndFollowingInfo for:", id);
+            const result = await getAllFollowersAndFollowingInfo(id);
+            
+            // ✅ Debug what React Query receives from the function
+            console.log("🔍 React Query received from getAllFollowersAndFollowingInfo:", {
+                userId: id,
+                result,
+                followersStructure: result?.followers?.[0],
+                followingStructure: result?.following?.[0],
+                hasCompleteData: {
+                    follower: !!result?.followers?.[0]?.follower,
+                    following: !!result?.following?.[0]?.following
+                }
+            });
+            
+            return result;
+        },
         enabled: !!id,
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 0, // ✅ Disable cache temporarily
+        cacheTime: 0, // ✅ Disable cache temporarily
+        // ✅ Add onSuccess callback
+        onSuccess: (data) => {
+            console.log("🎯 React Query onSuccess callback - final data:", {
+                userId: id,
+                data,
+                followersCount: data?.followers?.length,
+                followingCount: data?.following?.length,
+                sampleFollower: data?.followers?.[0],
+                sampleFollowing: data?.following?.[0]
+            });
+        }
     });
 
     // Get data of logged in user
@@ -57,29 +86,30 @@ const FollowPersonBody = ({ id, type }) => {
 
     return (
         <div className={css.container}>
-            <div className={css.head}>
-                <Typography.Title level={4}>{type}</Typography.Title>
-            </div>
-            
-            {userData?.[type]?.length === 0 ? (
-                <Alert message={`No ${type} found`} type="info" />
-            ) : (
-                <div className={css.body}>
-                    {userData?.[type]?.map((person, i) => (
-                        console.log("rendering person", person),
-                        <UserBox
-                            style={{
-                                width: "100%",
-                            }}
-                            key={person?.[type === "followers" ? "followerId" : "followingId"] || i}
-                            type={type === "followers" ? "follower" : "following"}
-                            data={person} // TARGET USER DATA
-                            loggedInUserData={loggedInUserData} // LOGGED IN USER DATA
-                        />
-                    ))}
-                </div>
-            )}
+      <div className={css.head}>
+        <Typography.Title level={4}>{type}</Typography.Title>
+      </div>
+      
+      {userData?.[type]?.length === 0 ? (
+        <Alert message={`No ${type} found`} type="info" />
+      ) : (
+        <div className={css.body}>
+          {userData?.[type]?.map((person, i) => {
+            console.log("userData", userData);
+            console.log("FollowPersonBody - Passing person to UserBox:", person);
+            return (
+              <UserBox
+                style={{ width: "100%" }}
+                key={person?.[type === "followers" ? "followerId" : "followingId"] || i}
+                type={type === "followers" ? "follower" : "following"}
+                data={person} // ✅ Pass the complete person object, not just the ID
+                loggedInUserData={loggedInUserData}
+              />
+            );
+          })}
         </div>
+      )}
+    </div>
     );
 };
 

@@ -1,0 +1,24 @@
+FROM node:18-slim
+
+RUN apt-get update -y && apt-get install -y openssl
+
+WORKDIR /app
+
+# Copy package files first
+COPY package.json package-lock.json ./
+
+# Copy Prisma schema early so postinstall works
+COPY prisma ./prisma
+
+# Install production deps only
+RUN npm ci --only=production
+
+# Copy rest of the app
+COPY lib ./lib
+COPY worker ./worker
+COPY utils ./utils  
+
+# (Optional) run again to be safe
+RUN npx prisma generate
+
+CMD ["node"]

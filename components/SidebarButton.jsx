@@ -11,7 +11,7 @@ const SidebarButton = () => {
   const { width } = useWindowDimensions();
   const [isvisible, setIsVisible] = useState(false);
   useEffect(() => {
-    if(width< 900) setIsVisible(true); // set mini state based on window size
+    if(width< 960) setIsVisible(true); // set mini state based on window size
     else setIsVisible(false);
     
   }, [width]);

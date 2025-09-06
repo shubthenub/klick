@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAllFollowersAndFollowingInfo, updateFollow } from "@/actions/user";
+import { getAllFollowersAndFollowingInfo, updateFollow , getFollowersAndFollowingIds } from "@/actions/user";
 import { Alert, Button, Skeleton, Typography } from "antd";
 import toast from "react-hot-toast";
 
@@ -13,7 +13,7 @@ const FollowButton = ({ id }) => {
   // Fixed: using useQuery instead of useQueryClient
   const { data, isLoading, isError } = useQuery({
     queryKey: ["user", currentUser?.id, "followInfo"],
-    queryFn: () => getAllFollowersAndFollowingInfo(currentUser?.id),
+    queryFn: () => getFollowersAndFollowingIds(currentUser?.id),
     enabled: !!currentUser?.id,
     staleTime: 1000 * 60 * 20,
   });

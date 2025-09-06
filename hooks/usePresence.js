@@ -20,6 +20,7 @@ export default function usePresence(userId) {
         });
 
         channel.bind("pusher:member_added", (member) => {
+            
             setOnlineUserIds(prev => [...prev, member.id]);
         });
 

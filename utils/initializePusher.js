@@ -1,6 +1,7 @@
 import Pusher from "pusher-js";
+import {auth} from "@clerk/nextjs";
 
-export const initializePusher = async ({ setPusherClient, setOnlineUsers }) => {
+export const initializePusher = async ({ setPusherClient, setOnlineUsers, setNotificationChannel, setUserChannel, userId }) => {
   const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
     authEndpoint: "/api/pusher/auth",
@@ -10,8 +11,12 @@ export const initializePusher = async ({ setPusherClient, setOnlineUsers }) => {
     forceTLS: true,
   });
 
-  const channel = pusher.subscribe("presence-chat");
 
+  const channel = pusher.subscribe("presence-chat");
+  const NotificationChannel= pusher.subscribe(`notification-${userId}`);
+  const userChannel = pusher.subscribe(`private-user-${userId}`);
+  console.log("subscribed to private user channel", `private-user-${userId}`)
+  console.log(`Subscribed to notification channel: notification-${userId}`);
   channel.bind("pusher:subscription_succeeded", (members) => {
     const users = [];
     members.each((member) => users.push(member.id));
@@ -28,5 +33,7 @@ export const initializePusher = async ({ setPusherClient, setOnlineUsers }) => {
   });
 
   setPusherClient(pusher);
+  setNotificationChannel(NotificationChannel);
+  setUserChannel(userChannel);
   return pusher;
 };

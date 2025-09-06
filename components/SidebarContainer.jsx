@@ -11,7 +11,7 @@ const SidebarContainer = ({
 }) => {
   const { width } = useWindowDimensions();
 
-  if (width <= 900) {
+  if (width <= 960) {
     return (
       <Drawer
         {...other}
@@ -25,7 +25,7 @@ const SidebarContainer = ({
     );
   }
   // 900px - 1268px: return mini sidebar wrapper
-  if (width >= 900 && width < 1268) {
+  if (width >= 960 && width < 1268) {
     return <div className={css.miniSidebarWrapper}  style={{minHeight:"86vh"}}>{children}</div>;
   }
 

@@ -1,0 +1,134 @@
+.sharedPostCard {
+  /* border: 1px solid #787878; */
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 200px;
+}
+
+.sharedPostCard:hover {
+  /* border-color: #ffc518; */
+  box-shadow: 0 2px 8px rgba(255, 197, 24, 0.1);
+}
+
+.postHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.authorInfo {
+  flex: 1;
+}
+
+.authorName {
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.authorUsername {
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.2;
+}
+
+.viewButton {
+  color: #666;
+}
+
+.messageText {
+  background-color: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-style: italic;
+  color: #333;
+}
+
+.postContent {
+  margin-bottom: 0.75rem;
+}
+
+.postText {
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.singleImage, .singleVideo {
+  margin-top: 0.5rem;
+}
+
+.multipleMedia {
+  margin-top: 0.5rem;
+}
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  max-width: 300px;
+}
+
+.mediaItem {
+  position: relative;
+}
+
+.moreMedia {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.postFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.sharedLabel {
+  font-size: 0.8rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* Dark theme */
+[data-theme="dark"] .sharedPostCard {
+  border-color: #333;
+  background-color: #1a1a1a;
+}
+
+[data-theme="dark"] .sharedPostCard:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+[data-theme="dark"] .authorUsername {
+  color: #999;
+}
+
+[data-theme="dark"] .messageText {
+  background-color: #2a2a2a;
+  color: #ccc;
+}
+
+[data-theme="dark"] .postFooter {
+  border-top-color: #333;
+}
+
+[data-theme="dark"] .sharedLabel {
+  color: #999;
+}

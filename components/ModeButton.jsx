@@ -16,7 +16,7 @@ const ModeButton = () => {
             ...prev, theme: prev.theme === "dark" ? "light" : "dark",
         }));
       }}
-      icon={<Icon icon="icon-park-solid:dark-mode" width={"35px"} />}
+      icon={<Icon icon="icon-park-solid:dark-mode" width={"30px"} />}
     />
   );
 };

@@ -1,7 +1,7 @@
 
 .container {
   display: flex;
-  min-height: 86vh;
+  min-height: 86dvh;
   border-radius: 1rem;
   overflow: hidden;
 }
@@ -37,7 +37,6 @@
 
 .activeFollower {
   background: #f1f1f1;
-  border-left: 4px solid #f0c136;
 }
 
 .followerItem:hover {
@@ -99,4 +98,8 @@
   justify-content: center;
   height: 100%;
   color: #6c757d;
+}
+
+.EmojiPickerReact{
+  width: 100px !important;
 }

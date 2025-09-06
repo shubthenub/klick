@@ -8,8 +8,11 @@ import ProfileBody from '../ProfileBody'
 import FollowPersonBody from '@/components/FollowPersonBody'
 const ProfileView = ({userId}) => {
   const {data , isLoading , isError} = useQuery({
-    queryKey : ['user' , {userId}],
-    queryFn : ()=> getUser(userId)
+    queryKey : ['user' , userId],
+    queryFn : ()=> getUser(userId),
+    cacheTime: 360000, // 1 hour
+    staleTime: 360000, // 1 hour
+    enabled: !!userId, // Only run the query if userId is truthy
   })
   console.log(data)
   const [selectedTab, setSelectedTab] = React.useState("1");

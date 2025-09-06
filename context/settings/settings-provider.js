@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { SettingsContext } from './settings-context';
 
 export const SettingsContextProvider = ({ children }) => {
@@ -23,10 +23,18 @@ export const SettingsContextProvider = ({ children }) => {
     }));
   };
   const [seenItems, setSeenItems] = useState(new Set());
-
+  const [notificationChannel, setNotificationChannel] = useState(null);
+  const [userChannel, setUserChannel] = useState(null);
   const markSeen = async (id) => {
     setSeenItems((prev) => new Set(prev).add(id));
   };
+
+  // 🔥 Post Modal state
+  const [postModalId, setPostModalId] = useState(null);
+  const openPostModal = (id) => setPostModalId(id);
+  const closePostModal = () => setPostModalId(null);
+  const dmChannelsRef = useRef({}); // For Pusher channels
+  const [chatIdMap, setChatIdMap] = useState({});
 
   const contextValue = {
     settings,
@@ -41,6 +49,16 @@ export const SettingsContextProvider = ({ children }) => {
     seenItems,
     setSeenItems,
     markSeen, // expose markSeen function
+    notificationChannel,
+    setNotificationChannel,
+    userChannel,
+    setUserChannel,
+    postModalId,
+    openPostModal,
+    closePostModal,
+    dmChannelsRef,
+    chatIdMap,
+    setChatIdMap,
   };
 
   return (

@@ -1,17 +1,16 @@
-"use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getFeed, getMyPosts } from "../actions/post";
 import { Flex, Spin, Typography } from "antd";
 import { LoadingOutlined } from '@ant-design/icons';
-import { useInView } from "react-intersection-observer";
-import Post from "./Post";
 import { useUser } from "@clerk/nextjs";
+import PostSkeleton from "./PostSkeleton";
+import Post from "./Post";
 
-const Posts = ({id="all"}) => {//id==all for feed , id=userId for profile page
-  // Infinite scroll logic using react-intersection-observer
-  const { ref, inView } = useInView();
+const Posts = ({ id = "all", take = 5 }) => {
   const { user: currentUser } = useUser();
+  const postRefs = useRef({});
+
   const {
     data,
     isLoading,
@@ -19,64 +18,141 @@ const Posts = ({id="all"}) => {//id==all for feed , id=userId for profile page
     isSuccess,
     fetchNextPage,
     hasNextPage,
+    isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["posts" , id],
-    queryFn: ({ pageParam = "" }) => 
-    id==="all" ? getFeed(pageParam , currentUser?.id) : getMyPosts(pageParam, id),// for feed
-    
-    
-    getNextPageParam: (lastPage) => lastPage?.metadata?.lastCursor,
+    queryKey: ["posts", id, take],
+    enabled: !!currentUser?.id,
+    queryFn: ({ pageParam = "" }) =>
+      id === "all"
+        ? getFeed(pageParam, currentUser?.id, take)
+        : getMyPosts(pageParam, id, take),
+    getNextPageParam: (lastPage) => {
+      const hasMore = lastPage?.metadata?.hasMore || lastPage?.metaData?.hasMore;
+      const cursor = lastPage?.metadata?.lastCursor || lastPage?.metaData?.lastCursor;
+      console.log('🔍 getNextPageParam debug:', { hasMore, cursor, cursorType: typeof cursor });
+      return hasMore && cursor ? cursor : undefined;
+    },
+    staleTime: 30 * 60 * 1000,
+    cacheTime: 30 * 60 * 1000,
   });
 
-  // Trigger fetching next page when inView is true
+  // Fetch next page when user is at n-3rd post from the end (more aggressive)
   useEffect(() => {
-    if (inView && hasNextPage) {
-      fetchNextPage();
+    if (!data?.pages || !hasNextPage || isFetchingNextPage) {
+      console.log('🚫 Skipping observer setup:', { 
+        hasPages: !!data?.pages, 
+        hasNextPage, 
+        isFetchingNextPage 
+      });
+      return;
     }
-  }, [inView, hasNextPage, fetchNextPage]);
+    
+    const allPosts = data.pages.flatMap(page => page.data || []);
+    console.log('📊 Total posts for observer:', allPosts.length);
+    
+    // Debug the posts structure
+    if (allPosts.length > 0) {
+      console.log('🔍 Sample post structure:', {
+        firstPost: allPosts[0],
+        firstPostId: allPosts[0]?.id,
+        lastPost: allPosts[allPosts.length - 1],
+        lastPostId: allPosts[allPosts.length - 1]?.id
+      });
+    }
+    
+    if (allPosts.length > 3) {
+      const targetIndex = Math.max(0, allPosts.length - 4); // when user is at n-3rd post from the end
+      const targetPost = allPosts[targetIndex];
+      
+      // Parse the post if it's stringified
+      const parsedTargetPost = typeof targetPost === 'string' ? JSON.parse(targetPost) : targetPost;
+      const targetId = parsedTargetPost?.id;
+      
+      console.log('🎯 Setting up observer for post:', {
+        targetIndex,
+        targetPost: parsedTargetPost,
+        targetId,
+        totalPosts: allPosts.length,
+        hasElement: !!postRefs.current[targetId]
+      });
+      
+      if (targetId && postRefs.current[targetId]) {
+        const observer = new window.IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+                console.log("📥 TRIGGERING: Fetching next page for post:", targetPost?.id);
+                fetchNextPage();
+              }
+            });
+          },
+          { threshold: 0.1, rootMargin: '200px' } // Trigger even earlier
+        );
+        
+        observer.observe(postRefs.current[targetId]);
+        console.log('✅ Observer set up for post:', targetId);
+        
+        return () => {
+          console.log('🧹 Cleaning up observer for post:', targetId);
+          observer.disconnect();
+        };
+      } else {
+        console.log('⚠️ No element found for targetId:', targetId);
+      }
+    } else {
+      console.log('🐛 Not enough posts for observer:', allPosts.length);
+    }
+  }, [data?.pages, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (isError) {
     return <Typography>Something went Wrong</Typography>;
   }
 
   if (isLoading) {
-    return (
-      <Flex vertical align="center" gap="large" justify="center">
-        <Spin indicator={<LoadingOutlined spin />} size="large" />
-      </Flex>
-    );
+    return <PostSkeleton />;
   }
 
-  return ( isSuccess &&
-    <Flex vertical gap="2rem">
-      {data?.pages?.map((page, pageIndex) =>
-        page?.data?.map((post, index) => {
-          const isLastItem =
-            pageIndex === data.pages.length - 1 &&
-            index === page.data.length - 1;
+  // Debug logging
+  console.log('🔍 Posts component data:', data);
+  console.log('🔍 Has next page:', hasNextPage);
+  console.log('🔍 Is fetching next page:', isFetchingNextPage);
+  console.log('🔍 Data pages:', data?.pages?.length);
+  if (data?.pages?.length > 0) {
+    const lastPage = data.pages[data.pages.length - 1];
+    console.log('🔍 Last page metadata:', lastPage?.metadata || lastPage?.metaData);
+  }
 
-          return (
-            <div
-              key={post?.id || `${pageIndex}-${index}`}
-              ref={isLastItem ? ref : null} // Attach ref to the last post
-              // style={{
-              //   width: "100%",
-              //   height: "30rem",
-              // }}
-            >
-              <Post data={post} queryId={id}/>
-            </div>
-          );
-        })
-      )}
-
-      {hasNextPage && (
-        <Flex align="center" justify="center" gap="large">
-          <Spin />
-          <Typography>Loading...</Typography>
-        </Flex>
-      )}
-    </Flex>
+  return (
+    isSuccess && (
+      <Flex vertical gap="2rem">
+        {data?.pages?.map((page, pageIndex) =>
+          page?.data?.map((post, index) => {
+            // Fix stringified post data
+            const parsedPost = typeof post === 'string' ? JSON.parse(post) : post;
+            
+            const isLastItem =
+              pageIndex === data.pages.length - 1 &&
+              index === page.data.length - 1;
+            return (
+              <div
+                key={parsedPost?.id || `${pageIndex}-${index}`}
+                ref={el => {
+                  postRefs.current[parsedPost?.id] = el;
+                }}
+              >
+                <Post data={parsedPost} queryId={["posts", id]} />
+              </div>
+            );
+          })
+        )}
+        {hasNextPage && (
+          <Flex align="center" justify="center" gap="large">
+            <Spin indicator={<LoadingOutlined spin />} size="large" />
+            <Typography></Typography>
+          </Flex>
+        )}
+      </Flex>
+    )
   );
 };
 

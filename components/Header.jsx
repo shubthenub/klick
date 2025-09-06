@@ -9,6 +9,7 @@ import ModeButton from './ModeButton';
 import SidebarButton from './SidebarButton';
 import { useContext } from 'react';
 import { SettingsContext } from "@/context/settings/settings-context";
+import NotificationButton from './NotificationButton';
 
 const Header = () => {
   const {settings} = useContext(SettingsContext);
@@ -20,13 +21,17 @@ const Header = () => {
       }}>
         
         <div className={css.container}>
-          <div className={css.sidebarButton}>
-          <SidebarButton/>
+          <div style={{display:"flex", alignItems:"center"}} >
+            <div className={css.sidebarButton}>
+            <SidebarButton/>
+            </div>
+            <Image src="/images/logo1.png" alt="Logo" width={150} height={45} quality={100} />
           </div>
-          <Image src="/images/logo1.png" alt="Logo" width={150} height={45} quality={100} />
+          
 
            {/* actions */}
            <Flex gap={25} align="center"> 
+            <NotificationButton />
             <ModeButton/>
             <UserButton />
           </Flex>

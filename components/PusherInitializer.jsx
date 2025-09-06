@@ -3,13 +3,15 @@ import { useAuth } from "@clerk/nextjs";
 import { useEffect, useContext } from "react";
 import { SettingsContext } from "@/context/settings/settings-context";
 import { initializePusher } from "@/utils/initializePusher";
+import { useUser } from "@clerk/nextjs";
 
 const PusherInitializer = () => {
-  const { pusherClient, setPusherClient, setOnlineUsers } = useContext(SettingsContext);
+  const { user } = useUser();
+  const { pusherClient, setPusherClient, setOnlineUsers, setNotificationChannel, setUserChannel } = useContext(SettingsContext);
   // const { getToken } = useAuth();
 
   useEffect(() => {
-    initializePusher({ setPusherClient, setOnlineUsers });
+    initializePusher({ setPusherClient, setOnlineUsers, setNotificationChannel, setUserChannel, userId: user?.id });
 
     return () => {
       if (pusherClient) {

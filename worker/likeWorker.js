@@ -118,7 +118,7 @@ const likeWorker = new Worker(
         });
 
         // 📡 Trigger via Pusher
-        await pusher.trigger(`Notification-${toUserId}`, "new-noti", notification);
+        await pusher.trigger(`notification-${toUserId}`, "new-noti", notification);
         console.log("📢 Pusher: Notification sent to", toUserId);
       }
     }
@@ -165,7 +165,7 @@ const likeWorker = new Worker(
         console.log("🗑️ Notification deleted:", notification.id);
 
         // 📡 Notify client to remove notification
-        await pusher.trigger(`Notification-${notification.toUserId}`, "new-noti", {
+        await pusher.trigger(`notification-${notification.toUserId}`, "new-noti", {
           deleted: true,
           id: notification.id,
         });

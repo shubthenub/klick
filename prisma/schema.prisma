@@ -44,7 +44,6 @@ model Post {
 
   @@index([authorId])
   @@index([createdAt])
-
 }
 
 model Like {
@@ -102,6 +101,7 @@ model Follow {
   createdAt   DateTime @default(now())
   follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
   following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
   @@index([followerId])
   @@index([followingId])
   @@index([createdAt])
@@ -162,7 +162,6 @@ model Notification {
   fromUser   User             @relation("Sender", fields: [fromUserId], references: [id], onDelete: Cascade)
   post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
   toUser     User             @relation("Receiver", fields: [toUserId], references: [id], onDelete: Cascade)
-
 
   @@index([toUserId])
   @@index([fromUserId])

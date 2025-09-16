@@ -32,8 +32,8 @@ const Posts = ({ id = "all", take = 5 }) => {
       console.log('🔍 getNextPageParam debug:', { hasMore, cursor, cursorType: typeof cursor });
       return hasMore && cursor ? cursor : undefined;
     },
-    staleTime: 30 * 60 * 1000,
-    cacheTime: 30 * 60 * 1000,
+    staleTime: Infinity,
+    cacheTime: Infinity,
   });
 
   // Fetch next page when user is at n-3rd post from the end (more aggressive)

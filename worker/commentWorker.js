@@ -30,7 +30,7 @@ const worker = new Worker("comments", async job => {
   console.log(`FINISHED JOB ${job.id}`);
 }, {
   connection,
-  concurrency: 1, // ← START WITH 1 TO TEST
+  concurrency: 50, // ← START WITH 1 TO TEST
   lockDuration: 30000
 });
 

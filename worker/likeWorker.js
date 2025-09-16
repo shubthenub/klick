@@ -250,6 +250,7 @@ const likeWorker = new Worker(
 
       await Promise.all(promises);
       console.log(`✅ All operations for ${action.toUpperCase()} completed.`);
+      console.log(`Pusher keys verification: private-chat-${chatId}, private-user-${(process.env.NEXT_PUBLIC_PUSHER_KEY||'')}`);
 
       // Update lastMessage cache
       const lastMessageKey = `lastMessage:${chatId}`;

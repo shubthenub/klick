@@ -25,6 +25,7 @@ import MediaUploadButton from "@/components/MediaUploadButton";
 import LikeButton from "@/components/LikeButton";
 import SharedPostPreview from "@/components/SharedPostPreview";
 import TypingDots from "@/components/TypingDots";
+import { Channel } from "pusher-js";
 
 export default function ChatPage() {
   // =================================================================
@@ -45,6 +46,7 @@ export default function ChatPage() {
     setSeenItems,
     setNotificationChannel,
     dmChannelsRef,
+    setUserChannel,
   } = useContext(SettingsContext);
 
   const [isTyping, setIsTyping] = useState(false);
@@ -559,20 +561,20 @@ export default function ChatPage() {
       }
     };
 
-    const handleLikeUpdate = ({ messageId, likes }) => {
-      queryClient.setQueryData(['messages', chatId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page => ({
-            ...page,
-            messages: page.messages.map(msg =>
-              msg.id === messageId ? { ...msg, Like: likes } : msg
-            ),
-          })),
-        };
-      });
-    };
+      const handleLikeUpdate = ({ messageId, likes, chatId: payloadChatId }) => {
+        queryClient.setQueryData(['messages', payloadChatId], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(msg =>
+                String(msg.id) === String(messageId) ? { ...msg, Like: likes } : msg
+              ),
+            })),
+          };
+        });
+      };
 
     const handleTyping = (data) => {
       if (data.userId !== userId) {
@@ -596,7 +598,7 @@ export default function ChatPage() {
       channel.unbind("new-message", handleNewMessage);
       channel.unbind("message-seen", handleMessageSeen);
       channel.unbind("message-like-updated", handleLikeUpdate);
-      pusherClient.unsubscribe(channelName); 
+      pusherClient.unsubscribe(`private-chat-${chatId}`); 
     };
   }, [chatId, pusherClient, data]);
 

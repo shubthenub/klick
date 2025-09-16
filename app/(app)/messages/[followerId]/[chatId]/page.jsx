@@ -46,6 +46,7 @@ export default function ChatPage() {
     setSeenItems,
     setNotificationChannel,
     dmChannelsRef,
+    userChannel,
     setUserChannel,
   } = useContext(SettingsContext);
 
@@ -600,7 +601,7 @@ export default function ChatPage() {
       channel.unbind("message-like-updated", handleLikeUpdate);
       pusherClient.unsubscribe(`private-chat-${chatId}`); 
     };
-  }, [chatId, pusherClient, data]);
+  }, [chatId, pusherClient]);
 
   useEffect(() => {
     queryClient.invalidateQueries(['messages', chatId]);

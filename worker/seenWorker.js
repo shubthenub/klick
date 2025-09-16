@@ -82,12 +82,19 @@ async function updateSeenStatusInRedis(chatId, messageId, userId) {
         msg.id === messageId ? { ...msg, seen: true, toBeSeen: false } : msg
       );
       
+      // ✅ FIXED: Also update seenMessageIds at root level
+      const updatedSeenMessageIds = cached.seenMessageIds || [];
+      if (!updatedSeenMessageIds.includes(messageId)) {
+        updatedSeenMessageIds.push(messageId);
+      }
+
       const updatedCache = {
         ...cached,
         pages: [{
           ...cached.pages[0],
           messages: updatedMessages
-        }]
+        }],
+        seenMessageIds: updatedSeenMessageIds
       };
       
       await redisSet(cacheKey, updatedCache, 600);

@@ -111,12 +111,19 @@ const Layout = ({ children }) => {
 
   // === PUSHER: Background message and like updates ===
   useEffect(() => {
-    if (!pusherClient || !userId) return;
+    console.log("🔍 Debug - Pusher effect running:", { 
+      pusherClient: !!pusherClient, 
+      userId, 
+      userChannel: !!userChannel,
+      queryClient: !!queryClient 
+    });
 
-    // const userChannel = pusherClient.subscribe(`private-user-${userId}`);
-    // console.log("subscribed to private user channel", `private-user-${userId}`)
+    if (!pusherClient || !userId || !userChannel) {
+      console.log("❌ Missing dependencies:", { pusherClient: !!pusherClient, userId, userChannel: !!userChannel });
+      return;
+    }
 
-    // Handle new message in background (not in active chat)
+  console.log("✅ All dependencies available, setting up listeners");
     const handleBackgroundMessage = (data) => {
       const { message } = data;
       const chatId = message.chatId;
@@ -211,7 +218,7 @@ const Layout = ({ children }) => {
       userChannel.unbind("message-seen", handleSeenUpdate);
       // pusherClient.unsubscribe(`private-user-${userId}`);
     };
-  }, [pusherClient, userId, queryClient]);
+  }, [pusherClient, userId, queryClient, userChannel]);
 
   const canRenderFollowers = !isLoading && filteredFollowers.length > 0;
   const isLoadingData = isLoadingFollowers || isLoadingChats;

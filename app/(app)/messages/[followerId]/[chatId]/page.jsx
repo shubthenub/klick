@@ -43,7 +43,7 @@ export default function ChatPage() {
     seenItems,
     markSeen,
     setSeenItems,
-    setNotifcationChannel,
+    setNotificationChannel,
     dmChannelsRef,
   } = useContext(SettingsContext);
 
@@ -588,14 +588,15 @@ export default function ChatPage() {
     channel.bind("message-seen", handleMessageSeen);
     channel.bind("pusher:subscription_error", async () => {
       console.warn("🔁 Reinitializing Pusher due to subscription error");
-      await initializePusher({ setPusherClient, setOnlineUsers, setNotifcationChannel, userId });
+      await initializePusher({ setPusherClient, setOnlineUsers, setNotificationChannel,setUserChannel, userId });
     });
 
     return () => {
       channel.unbind("typing", handleTyping);
       channel.unbind("new-message", handleNewMessage);
       channel.unbind("message-seen", handleMessageSeen);
-      channel.unbind("message-like-updated"); // Corrected unbind
+      channel.unbind("message-like-updated", handleLikeUpdate);
+      pusherClient.unsubscribe(channelName); 
     };
   }, [chatId, pusherClient, data]);
 
